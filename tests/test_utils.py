@@ -18,7 +18,7 @@
 import numpy as np
 import pint
 
-from readers_xrd.utils import (
+from fairmat_readers_xrd.utils import (
     to_pint_quantity,
     modify_scan_data,
     detect_scan_type,

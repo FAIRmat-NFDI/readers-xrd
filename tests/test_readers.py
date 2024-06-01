@@ -20,7 +20,7 @@ import numpy as np
 
 import pint
 
-from readers_xrd import (
+from fairmat_readers_xrd import (
     read_panalytical_xrdml,
     read_rigaku_rasx,
     read_bruker_brml,

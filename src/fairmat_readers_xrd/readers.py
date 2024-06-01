@@ -22,11 +22,11 @@ import numpy as np
 import pint
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
-from readers_xrd.utils import (
+from fairmat_readers_xrd.utils import (
     detect_scan_type,
     modify_scan_data,
 )
-from readers_xrd.ikz import RASXfile, BRMLfile
+from fairmat_readers_xrd.ikz import RASXfile, BRMLfile
 
 if TYPE_CHECKING:
     from structlog.stdlib import (

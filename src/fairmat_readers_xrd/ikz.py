@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         BoundLogger,
     )
 
-from readers_xrd.utils import to_pint_quantity
+from fairmat_readers_xrd.utils import to_pint_quantity
 
 
 def try_scalar(val):
