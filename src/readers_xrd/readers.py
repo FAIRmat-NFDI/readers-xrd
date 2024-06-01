@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 import collections
 from typing import Dict, Any, TYPE_CHECKING
 import numpy as np
-from nomad.units import ureg
+import pint
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from readers_xrd.utils import (
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         BoundLogger,
     )
 
+ureg = pint.get_application_registry()
 
 def transfer_data_into_template(**kwargs):
     raise NotImplementedError

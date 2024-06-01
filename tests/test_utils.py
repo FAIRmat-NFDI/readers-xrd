@@ -16,13 +16,15 @@
 # limitations under the License.
 #
 import numpy as np
+import pint
 
-from nomad.units import ureg
 from readers_xrd.utils import (
     to_pint_quantity,
     modify_scan_data,
     detect_scan_type,
 )
+
+ureg = pint.get_application_registry()
 
 
 def test_to_pint_quantity():

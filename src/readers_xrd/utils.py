@@ -18,9 +18,9 @@
 import numpy as np
 import collections
 from typing import Any
+import pint
 
-from nomad.units import ureg
-
+ureg = pint.get_application_registry()
 
 def to_pint_quantity(value: Any=None, unit: str=None) -> Any:
     '''
