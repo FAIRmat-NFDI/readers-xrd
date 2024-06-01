@@ -24,7 +24,7 @@ from nomad.datamodel.metainfo.basesections import (
     PureSubstanceSection,
 )
 from nomad.units import ureg
-from nomad_measurements.utils import (
+from readers_xrd.utils import (
     merge_sections,
     to_pint_quantity,
     modify_scan_data,

@@ -19,7 +19,7 @@ import json
 import numpy as np
 
 from nomad.units import ureg
-from nomad_measurements.xrd.readers import (
+from readers_xrd import (
     read_panalytical_xrdml,
     read_rigaku_rasx,
     read_bruker_brml,

@@ -22,11 +22,11 @@ import numpy as np
 from nomad.units import ureg
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
-from nomad_measurements.utils import (
+from readers_xrd.utils import (
     detect_scan_type,
     modify_scan_data,
 )
-from nomad_measurements.xrd.ikz import RASXfile, BRMLfile
+from readers_xrd.ikz import RASXfile, BRMLfile
 
 if TYPE_CHECKING:
     from structlog.stdlib import (

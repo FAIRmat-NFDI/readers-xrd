@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         BoundLogger,
     )
 
-from nomad_measurements.utils import to_pint_quantity
+from readers_xrd.utils import to_pint_quantity
 
 
 def try_scalar(val):
