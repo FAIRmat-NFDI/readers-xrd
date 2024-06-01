@@ -22,8 +22,9 @@ import pint
 
 ureg = pint.get_application_registry()
 
-def to_pint_quantity(value: Any=None, unit: str=None) -> Any:
-    '''
+
+def to_pint_quantity(value: Any = None, unit: str = None) -> Any:
+    """
     Attempts to generate a pint quantity.
     In case the value is a string, it is returned as is.
     If the value is a pint quantity, it is converted to the given unit.
@@ -34,7 +35,7 @@ def to_pint_quantity(value: Any=None, unit: str=None) -> Any:
 
     Returns:
         Any: Processed quantity with datatype depending on the value.
-    '''
+    """
     if isinstance(value, str) or value is None:
         return value
     if isinstance(value, ureg.Quantity):
@@ -43,8 +44,9 @@ def to_pint_quantity(value: Any=None, unit: str=None) -> Any:
         return value.to(unit)
     return value * ureg(unit)
 
+
 def are_all_identical(arr_list):
-    '''
+    """
     Check if all the arrays in the list are identical. Also works if the arrays are
     pint.Quantity.
 
@@ -53,7 +55,7 @@ def are_all_identical(arr_list):
 
     Returns:
         bool: True if all the arrays are identical, False otherwise.
-    '''
+    """
     first_arr = arr_list[0]
     if isinstance(first_arr, ureg.Quantity):
         first_arr = first_arr.magnitude
@@ -65,8 +67,9 @@ def are_all_identical(arr_list):
             return False
     return True
 
+
 def detect_scan_type(scan_data):
-    '''
+    """
     Based on the shape of data vectors, decide whether the scan_type is `line` (single
     line scan), `multiline` (multiple line scans), or `rsm` (reciprocal space mapping).
     For a 2D scan, if the conditions for `rsm` are not met, it is considered a `multiline`
@@ -78,7 +81,7 @@ def detect_scan_type(scan_data):
 
     Returns:
         str: The type of scan.
-    '''
+    """
     if len(scan_data['intensity']) == 1:
         return 'line'
 
@@ -89,8 +92,10 @@ def detect_scan_type(scan_data):
 
     intensity_data = np.array(scan_data['intensity']).squeeze()
     if intensity_data.ndim > 2:
-        raise AssertionError(f'Scan type not detected. `intensity.ndim` must be 1 or 2.\
-                             Found: {intensity_data.ndim}')
+        raise AssertionError(
+            f'Scan type not detected. `intensity.ndim` must be 1 or 2.\
+                             Found: {intensity_data.ndim}'
+        )
 
     if not are_all_identical(scan_data['2Theta']):
         return 'multiline'
@@ -114,8 +119,9 @@ def detect_scan_type(scan_data):
             return 'rsm'
     return 'multiline'
 
+
 def modify_scan_data(scan_data: dict, scan_type: str):
-    '''
+    """
     Modifies the scan data based on the scan type:
 
     If the scan type is `line`, the data is converted to 1D arrays.
@@ -137,7 +143,7 @@ def modify_scan_data(scan_data: dict, scan_type: str):
 
     Returns:
         dict: scan_data containing same keys but modified values.
-    '''
+    """
     output = collections.defaultdict(lambda: None)
 
     if scan_type not in ['line', 'rsm', 'multiline']:

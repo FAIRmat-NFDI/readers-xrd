@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 ureg = pint.get_application_registry()
 
+
 def transfer_data_into_template(**kwargs):
     raise NotImplementedError
 

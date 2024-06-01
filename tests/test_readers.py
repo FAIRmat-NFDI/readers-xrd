@@ -28,6 +28,7 @@ from readers_xrd import (
 
 ureg = pint.get_application_registry()
 
+
 def convert_quantity_to_string(data_dict):
     """
     In a dict, recursively convert every pint.Quantity into str containing its shape.
