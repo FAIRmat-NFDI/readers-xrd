@@ -25,11 +25,14 @@ classifiers = [
 ]
 dependencies = [
     "xmltodict==0.13.0",
+    "numpy~=1.22.4",
+    "pint",
 ]
 [project.optional-dependencies]
 dev = [
     "pytest",
     "ruff==0.1.8",
+    "structlog==22.3.0",
 ]
 
 [project.license]
