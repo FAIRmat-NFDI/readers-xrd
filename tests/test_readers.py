@@ -18,12 +18,15 @@
 import json
 import numpy as np
 
-from nomad.units import ureg
-from nomad_measurements.xrd.readers import (
+import pint
+
+from fairmat_readers_xrd import (
     read_panalytical_xrdml,
     read_rigaku_rasx,
     read_bruker_brml,
 )
+
+ureg = pint.get_application_registry()
 
 
 def convert_quantity_to_string(data_dict):

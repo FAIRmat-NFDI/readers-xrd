@@ -1,0 +1,92 @@
+[build-system]
+requires = [
+    "setuptools>=61.0.0",
+    "setuptools-scm>=8.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fairmat-readers-xrd"
+dynamic = ["version"]
+description = "A package containing file readers for XRD raw files."
+readme = "README.md"
+authors = [
+    { name = "Sarthak Kapoor", email = 'sarthak.kapoor@physik.hu-berlin.de' },
+    { name = "Hampus Näsström", email = 'hampus.naesstroem@physik.hu-berlin.de' },
+    { name = "Andrea Albino", email = 'andrea.albino@physik.hu-berlin.de' },
+    { name = "Sebastian Brückner", email = 'sebastian.brueckner@ikz-berlin.de' },
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+    "xmltodict==0.13.0",
+    "numpy~=1.22.4",
+    "pint",
+]
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff==0.1.8",
+    "structlog==22.3.0",
+]
+
+[project.license]
+file = "LICENSE"
+
+[project.urls]
+"Homepage" = "https://github.com/FAIRmat-NFDI/readers-xrd"
+"Bug Tracker" = "https://github.com/FAIRmat-NFDI/readers-xrd/issues"
+
+[tool.ruff]
+include = ["src/*.py", "tests/*.py"]
+select = [
+    "E", # pycodestyle
+    "W", # pycodestyle
+    "PL", # pylint
+]
+ignore = [
+    "E501", # Line too long ({width} > {limit} characters)
+    "E701", # Multiple statements on one line (colon)
+    "E731", # Do not assign a lambda expression, use a def
+    "E402",  # Module level import not at top of file
+    "PLR0911", # Too many return statements
+    "PLR0912", # Too many branches
+    "PLR0913", # Too many arguments in function definition
+    "PLR0915", # Too many statements
+    "PLR2004", # Magic value used instead of constant
+    "PLW0603", # Using the global statement
+    "PLW2901", # redefined-loop-name
+    "PLR1714", # consider-using-in
+    "PLR5501", # else-if-used
+]
+fixable = ["ALL"]
+exclude = ["dependencies"]
+
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+[tool.ruff.format]
+# use single quotes for strings.
+quote-style = "single"
+
+# indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+[tool.setuptools.packages.find]
+where = [
+    "src",
+]
+
+[tool.setuptools_scm]
