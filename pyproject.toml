@@ -11,10 +11,10 @@ dynamic = ["version"]
 description = "A package containing file readers for XRD raw files."
 readme = "README.md"
 authors = [
-    { name = "Sarthak Kapoor", email = 'sarthak.kapoor@physik.hu-berlin.de' },
-    { name = "Hampus Näsström", email = 'hampus.naesstroem@physik.hu-berlin.de' },
-    { name = "Andrea Albino", email = 'andrea.albino@physik.hu-berlin.de' },
-    { name = "Sebastian Brückner", email = 'sebastian.brueckner@ikz-berlin.de' },
+    { name = "Sarthak Kapoor", email = "sarthak.kapoor@physik.hu-berlin.de" },
+    { name = "Hampus Näsström", email = "hampus.naesstroem@physik.hu-berlin.de" },
+    { name = "Andrea Albino", email = "andrea.albino@physik.hu-berlin.de" },
+    { name = "Sebastian Brückner", email = "sebastian.brueckner@ikz-berlin.de" },
 ]
 requires-python = ">=3.9"
 classifiers = [
