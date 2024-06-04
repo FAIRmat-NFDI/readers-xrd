@@ -90,3 +90,4 @@ where = [
 ]
 
 [tool.setuptools_scm]
+write_to = "src/fairmat_readers_xrd/_version.py"
