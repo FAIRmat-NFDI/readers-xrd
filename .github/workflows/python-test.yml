@@ -14,9 +14,7 @@ permissions:
 
 jobs:
   test:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
@@ -30,3 +28,12 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
+
+  ruff-linting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: chartboost/ruff-action@v1
+        with:
+          args: "format . --check"
+          version: 0.2.0
