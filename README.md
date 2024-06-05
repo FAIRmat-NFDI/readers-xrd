@@ -1,15 +1,23 @@
 # fairmat-readers-xrd
-A package developed by FAIRmat and collaborators which contains file readers for various
-X-Ray Diffraction (XRD) file formats.
+A package developed by FAIRmat and collaborators that contains file readers for various
+X-ray diffraction (XRD) file formats.
 
 ## Install and use
-To use the readers, install the package using `pip` and import the specific reader
-function.
+To use the readers, install the package using `pip` and import the `read_file`
+function. It will check the file extension and, using an appropriate file
+reader, return a Python dictionary containing the data.
 
 ```sh
 pip install fairmat-readers-xrd
 ```
+```py
+from fairmat_readers_xrd import read_file
 
+file_path = "<filepath>.xrdml"
+data_dict =  read_file(file_path)
+```
+
+You can also import individual file readers. 
 ```py
 from fairmat_readers_xrd import read_panalytical_xrdml
 
