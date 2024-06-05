@@ -40,6 +40,25 @@ def transfer_data_into_template(**kwargs):
     raise NotImplementedError
 
 
+def read_file(file_path: str) -> dict:
+    """
+    Main function to figure out which specific file format to read.
+    
+    Args:
+        file_path (str): The path to the file to be read.
+
+    Returns:
+        Dict[str, Any]: The X-ray diffraction data in a Python dictionary.
+    """
+    if file_path.endswith(".rasx"):
+        return read_rigaku_rasx(file_path)
+    if file_path.endswith(".xrdml"):
+        return read_panalytical_xrdml(file_path)
+    if file_path.endswith(".brml"):
+        return read_bruker_brml(file_path)
+    raise NotImplementedError('Unknown file type.')
+
+
 def read_panalytical_xrdml(
     file_path: str, logger: 'BoundLogger' = None
 ) -> Dict[str, Any]:
