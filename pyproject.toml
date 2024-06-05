@@ -16,7 +16,7 @@ authors = [
     { name = "Andrea Albino", email = "andrea.albino@physik.hu-berlin.de" },
     { name = "Sebastian Brückner", email = "sebastian.brueckner@ikz-berlin.de" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
