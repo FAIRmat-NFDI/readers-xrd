@@ -48,7 +48,7 @@ def read_file(file_path: str) -> dict:
         return read_panalytical_xrdml(file_path)
     if file_path.endswith(".brml"):
         return read_bruker_brml(file_path)
-    return {}
+    raise NotImplementedError('Unknown file type.')
 
 
 def read_panalytical_xrdml(
