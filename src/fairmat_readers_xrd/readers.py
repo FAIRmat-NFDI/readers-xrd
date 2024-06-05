@@ -40,6 +40,17 @@ def transfer_data_into_template(**kwargs):
     raise NotImplementedError
 
 
+def read_file(file_path: str) -> dict:
+    """Main function to figure out which specific file format to read."""
+    if file_path.endswith(".rasx"):
+        return read_rigaku_rasx(file_path)
+    if file_path.endswith(".xrdml"):
+        return read_panalytical_xrdml(file_path)
+    if file_path.endswith(".brml"):
+        return read_bruker_brml(file_path)
+    return {}
+
+
 def read_panalytical_xrdml(
     file_path: str, logger: 'BoundLogger' = None
 ) -> Dict[str, Any]:
