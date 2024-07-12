@@ -43,7 +43,7 @@ your local and start a virtual Python environment inside the directory.
 ```sh
 git clone git@github.com:FAIRmat-NFDI/readers-xrd.git
 cd readers-xrd
-python3.9 -m venv .pyenv
+python3 -m venv .pyenv
 source .pyenv/bin/activate
 ```
 
