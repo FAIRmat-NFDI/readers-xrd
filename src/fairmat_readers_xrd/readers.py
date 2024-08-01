@@ -278,7 +278,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
     modified_scan_data['Omega'] = modified_scan_data.pop(
-        'Theta'
+        'Theta', None
     )  # theta and omega are synonymous in .brml
 
     return {
