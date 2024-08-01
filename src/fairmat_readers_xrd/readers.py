@@ -239,12 +239,8 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
                 )
         scan_axis = scan_info.get('AxisName', None)
 
-    output = {
-        'intensity': modified_scan_data['intensity'],
-        '2Theta': modified_scan_data['2Theta'],
-        'Omega': modified_scan_data['Omega'],
-        'Chi': modified_scan_data['Chi'],
-        'Phi': modified_scan_data['Phi'],
+    return {
+        **modified_scan_data,
         'countTime': count_time,
         'metadata': {
             'sample_id': None,
@@ -261,8 +257,6 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
             },
         },
     }
-
-    return output
 
 
 def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
@@ -283,13 +277,10 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     scan_data = reader.get_scan_data(logger)
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
+    modified_scan_data['Omega'] = modified_scan_data.pop('Theta')  # theta and omega are synonymous in .brml
 
-    output = {
-        'intensity': modified_scan_data['intensity'],
-        '2Theta': modified_scan_data['2Theta'],
-        'Omega': modified_scan_data['Theta'],  # theta and omega are synonymous in .brml
-        'Chi': modified_scan_data['Chi'],
-        'Phi': modified_scan_data['Phi'],
+    return {
+        **modified_scan_data,
         'countTime': None,
         'metadata': {
             'sample_id': None,
@@ -306,8 +297,6 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
             },
         },
     }
-
-    return output
 
 
 def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
