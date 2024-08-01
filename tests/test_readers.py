@@ -48,8 +48,9 @@ def convert_quantity_to_string(data_dict):
 
 def test_rasx_reader():
     file_path = [
-        'tests/data/RSM_111_sdd=350.rasx',
-        'tests/data/Omega-2Theta_scan_high_temperature.rasx',
+        'tests/data/RSM_111_sdd=350.rasx',  # File with RSM data
+        'tests/data/Omega-2Theta_scan_high_temperature.rasx',  # File with line scan data
+        'tests/data/ZnO-ALD-training_001_1_0-000_0-000.rasx',  # File with X, Y data
     ]
     for path in file_path:
         output = read_rigaku_rasx(path)
