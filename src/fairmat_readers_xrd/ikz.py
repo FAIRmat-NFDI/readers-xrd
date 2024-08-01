@@ -253,7 +253,7 @@ class RASXfile(object):
                 )
             )
 
-        for axis in ['Omega', 'Chi', 'Phi']:
+        for axis in ['Omega', 'Chi', 'Phi', 'X', 'Y']:
             # get axis positions
             if axis not in self.positions:
                 output[axis] = None

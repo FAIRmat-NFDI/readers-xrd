@@ -1,0 +1,24 @@
+{
+    "intensity": "(7001,)",
+    "2Theta": "(7001,)",
+    "Omega": "(1,)",
+    "Chi": "(1,)",
+    "Phi": "(1,)",
+    "X": "(1,)",
+    "Y": "(1,)",
+    "countTime": "(1,)",
+    "metadata": {
+        "sample_id": null,
+        "scan_axis": "TwoThetaTheta",
+        "scan_type": "line",
+        "source": {
+            "anode_material": "Cu",
+            "kAlpha1": "1.540593",
+            "kAlpha2": "1.544414",
+            "kBeta": "1.392246",
+            "voltage": "40",
+            "current": "30",
+            "ratioKAlpha2KAlpha1": null
+        }
+    }
+}
