@@ -44,6 +44,9 @@ def convert_quantity_to_string(data_dict):
                 data_dict[k] = str(v.magnitude)
         if isinstance(v, dict):
             convert_quantity_to_string(v)
+        if isinstance(v, list):
+            for i in v:
+                convert_quantity_to_string(i)
 
 
 def test_rasx_reader():
