@@ -146,10 +146,10 @@ def modify_scan_data(scan_data: dict, scan_type: str):
     """
     output = collections.defaultdict(lambda: None)
 
-    if scan_type not in ['line', 'rsm', 'multiline']:
+    if scan_type not in ['line', 'rsm', 'multiline', '2d_mode']:
         raise ValueError(f'Invalid scan type: {scan_type}')
 
-    if scan_type == 'line':
+    if scan_type in ['line', '2d_mode']:
         for key, value in scan_data.items():
             if value is None:
                 continue
