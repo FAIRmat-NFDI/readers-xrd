@@ -127,6 +127,14 @@ def parse_rasx_metadata(xml):
                 print('Warning: unknown axis attribute: %s' % key)
         axes[axis.attrib['Name']] = Axis(**attrib)
 
+    if measurement.find('ImageInformation'):
+        mdata['ImageInformation'] = dict(
+            [
+                (info[0].text, try_scalar(info[1].text))
+                for info in measurement.find('ImageInformation/DTHeader')
+            ]
+        )
+
     return mdata
 
 
@@ -174,17 +182,16 @@ class RASXfile(object):
 
                 with fh.open(metafile) as xml:
                     meta.append(parse_rasx_metadata(xml))
-                optics = meta[-1]['HardwareConfig']['optics']
-                if optics['Detector'] == 'HyPix3000(H)':
-                    det_shape = 385, 775
-                elif optics['Detector'] == 'HyPix3000(V)':
-                    det_shape = 775, 385
+                image_info = meta[-1]['ImageInformation']
+                det_shape_str = image_info.get('PXD_DETECTOR_DIMENSIONS')
+                if det_shape_str:
+                    det_shape = tuple(int(i) for i in det_shape_str.split())
                 else:
                     det_shape = (-1,)
                 with fh.open(imgpath) as f:
-                    imgarr = np.fromstring(f.read(), dtype=np.uint32)
-                    imgarr.resize(det_shape)
-                    imgdata.append(imgarr)
+                    imgarr = np.frombuffer(f.read(), dtype=np.uint32).copy()
+                    resized_imgarr = np.reshape(imgarr, det_shape)
+                    imgdata.append(resized_imgarr)
 
             if verbose:
                 print()
