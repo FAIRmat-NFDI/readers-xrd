@@ -230,6 +230,37 @@ class RASXfile(object):
 
         return output
 
+    def get_scan_hypix_data(self, logger: 'BoundLogger' = None):
+        """
+        Collects the HyPix3000 detector data, if available.
+
+        Returns:
+            Dict[str, Any]: contains information about the HyPix data
+        """
+        if not self.images:
+            return None
+
+        output = collections.defaultdict(list)
+
+        for image in self.images:
+            # get intensity and two_theta
+            output['intensity'].append(to_pint_quantity(image, None))
+
+        for axis in ['TwoTheta', 'Omega', 'Chi', 'Phi', 'X', 'Y']:
+            # get axis positions
+            if axis not in self.positions:
+                output[axis] = None
+                continue
+            if not isinstance(self.positions[axis], np.ndarray):
+                self.positions[axis] = np.array([self.positions[axis]])
+            for ax_data_per_scan in self.positions[axis]:
+                ax_data_per_scan = ax_data_per_scan.reshape(-1)
+                output[axis].append(
+                    to_pint_quantity(ax_data_per_scan, self.units.get(axis, 'deg'))
+                )
+
+        return output
+
     def get_scan_data(self, logger: 'BoundLogger' = None):
         """
         Collect intensity, two_theta, and axis positions. If units are not available for
@@ -242,6 +273,9 @@ class RASXfile(object):
             Dict[str, Any]: Each element contains a list of scan data as ureg.Quantity
                 arrays.
         """
+        if not self.data:
+            return None
+
         output = collections.defaultdict(list)
 
         scan_axis = None
