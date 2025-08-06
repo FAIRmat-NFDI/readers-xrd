@@ -227,7 +227,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
         scan_type = detect_scan_type(scan_data)
         modified_scan_data = modify_scan_data(scan_data, scan_type)
     elif scan_hypix_data and not scan_data:
-        scan_type = '2d_mode'
+        scan_type = 'area_detector'
         modified_scan_data = modify_scan_data(scan_hypix_data, scan_type)
     else:
         raise ValueError(

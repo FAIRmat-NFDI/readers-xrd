@@ -133,6 +133,12 @@ def modify_scan_data(scan_data: dict, scan_type: str):
     to a 1D array containing the first row. Similar to before, if the elements of this row
     are identical, it is reduced to a point vector of size 1.
 
+    If the scan type is `area_detector`, the `intensity` is of shape (i,x,y) with `x`
+    and `y` being the pixel dimensions of the detector and `i` being the number of
+    images. All other data undergoes same transformation as in `rsm`: Matrix of shape
+    (1,n) is converted to a 1D array of length `n` and if the elements of this row
+    are identical, it is reduced to a point vector of size 1.
+
     If the scan type is `multiline`, the data is converted into a list of 1D arrays.
     Currently not implemented.
 
@@ -146,10 +152,10 @@ def modify_scan_data(scan_data: dict, scan_type: str):
     """
     output = collections.defaultdict(lambda: None)
 
-    if scan_type not in ['line', 'rsm', 'multiline', '2d_mode']:
+    if scan_type not in ['line', 'rsm', 'multiline', 'area_detector']:
         raise ValueError(f'Invalid scan type: {scan_type}')
 
-    if scan_type in ['line', '2d_mode']:
+    if scan_type in ['line']:
         for key, value in scan_data.items():
             if value is None:
                 continue
@@ -168,6 +174,23 @@ def modify_scan_data(scan_data: dict, scan_type: str):
             if value is None:
                 continue
             data = np.array(value)
+            # if it is column vector, make it a row vector
+            if data.shape[1] == 1:
+                data = data.reshape(-1)
+            # if rows (or elements of a row) are identical, pick the first one
+            if np.all(np.diff(data, axis=0) == 0):
+                data = data[0].reshape(-1)
+            output[key] = data * value[0].units
+        return output
+
+    elif scan_type == 'area_detector':
+        for key, value in scan_data.items():
+            if value is None:
+                continue
+            data = np.array(value)
+            if key == 'intensity':
+                output[key] = data * value[0].units
+                continue
             # if it is column vector, make it a row vector
             if data.shape[1] == 1:
                 data = data.reshape(-1)
