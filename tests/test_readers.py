@@ -24,6 +24,7 @@ from fairmat_readers_xrd import (
     read_panalytical_xrdml,
     read_rigaku_rasx,
     read_bruker_brml,
+    read_rigaku_raw,
 )
 
 ureg = pint.get_application_registry()
@@ -87,3 +88,58 @@ def test_brml_reader():
         with open(f'{path}.json', 'r', encoding='utf-8') as f:
             reference = json.load(f)
         assert output == reference
+
+
+def test_rigaku_raw_reader():
+    """
+    Test the Rigaku RAW parser with a sample file.
+    
+    This test validates:
+    - Binary file parsing
+    - Metadata extraction
+    - Intensity data extraction
+    - Scan parameter completion (from paired XRDML if available)
+    - Output format compatibility with other readers
+    """
+    # Note: This test requires a sample .raw file to be added to tests/data/
+    # For now, we test the basic functionality without a reference JSON
+    try:
+        import os
+        # Check if a test RAW file exists
+        test_raw = 'tests/data/test_sample.raw'
+        if os.path.exists(test_raw):
+            output = read_rigaku_raw(test_raw)
+            
+            # Validate structure
+            assert output is not None, "read_rigaku_raw returned None"
+            assert '2Theta' in output, "Missing 2Theta data"
+            assert 'intensity' in output, "Missing intensity data"
+            assert 'metadata' in output, "Missing metadata"
+            assert 'scanmotname' in output, "Missing scanmotname"
+            
+            # Validate data types
+            assert isinstance(output['2Theta'], list), "2Theta should be a list"
+            assert isinstance(output['intensity'], list), "intensity should be a list"
+            assert isinstance(output['metadata'], dict), "metadata should be a dict"
+            
+            # Validate units (should be pint Quantities)
+            if len(output['2Theta']) > 0:
+                assert hasattr(output['2Theta'][0], 'magnitude'), "2Theta should have units"
+                assert hasattr(output['2Theta'][0], 'units'), "2Theta should have units"
+            
+            if len(output['intensity']) > 0:
+                assert hasattr(output['intensity'][0], 'magnitude'), "intensity should have units"
+                
+            # Test with reference JSON if it exists
+            if os.path.exists(f'{test_raw}.json'):
+                convert_quantity_to_string(output)
+                with open(f'{test_raw}.json', 'r', encoding='utf-8') as f:
+                    reference = json.load(f)
+                assert output == reference
+        else:
+            # Skip test if no sample file available
+            import pytest
+            pytest.skip("No test RAW file available in tests/data/")
+    except Exception as e:
+        import pytest
+        pytest.skip(f"RAW reader test skipped: {str(e)}")

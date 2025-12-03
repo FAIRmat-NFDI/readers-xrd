@@ -17,9 +17,15 @@
 #
 import xml.etree.ElementTree as ET
 import collections
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, TYPE_CHECKING, Optional
 import numpy as np
 import pint
+import os
+import shutil
+import subprocess
+import tempfile
+import platform
+from pathlib import Path
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
@@ -299,6 +305,75 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
             },
         },
     }
+
+
+def read_rigaku_raw(
+    file_path: str, logger: 'BoundLogger' = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Read Rigaku binary .raw files using native Python parser.
+
+    This function parses Rigaku RAW 4.00 binary files directly without requiring
+    external conversion tools. All scan parameters (start_angle, step_size, num_points)
+    are extracted directly from the binary file.
+
+    Args:
+        file_path (str): Path to the Rigaku .raw file.
+        logger (BoundLogger, optional): Logger instance for warnings/errors.
+
+    Returns:
+        Dict[str, Any] | None: XRD data dictionary compatible with nomad-measurements
+                               schema, or None if parsing fails.
+
+    Note:
+        - Only RAW 4.00 format is currently supported
+        - All scan parameters are extracted from the binary file
+        - No external files (.xrdml) are required
+
+    Citation for RAW format understanding:
+        Rigaku Corporation. RAW file format is proprietary but reverse-engineered
+        for open science data management.
+    """
+    from .rigaku_raw_parser import RigakuRAW4Parser
+    
+    try:
+        # Parse the RAW file - all parameters are extracted from the file
+        parser = RigakuRAW4Parser(file_path)
+        raw_data = parser.parse()
+        
+        # Convert to standard format matching read_panalytical_xrdml output
+        two_theta = np.array(parser.angles) * ureg.degree
+        intensity = np.array(parser.intensities) * ureg.dimensionless
+        
+        # Build metadata dictionary
+        metadata = {
+            'sample_id': raw_data['metadata'].get('sample_id'),
+            'scan_type': 'line',  # RAW files are typically 1D scans
+            'scan_axis': '2Theta',
+        }
+        
+        # Add source metadata if available (RAW files don't typically have this)
+        # But we include the structure for consistency
+        metadata['source'] = {}
+        
+        # Return data in the same format as read_panalytical_xrdml
+        return {
+            '2Theta': [two_theta],  # List of arrays for consistency with XRDML
+            'intensity': [intensity],
+            'counts': None,  # RAW doesn't distinguish counts from intensity
+            'countTime': None,  # Not available in RAW format
+            'beamAttenuationFactors': None,  # Not available in RAW format
+            'scanmotname': '2Theta',
+            'metadata': metadata,
+        }
+        
+    except Exception as e:
+        if logger:
+            logger.error(
+                f'Failed to parse Rigaku .raw file {file_path}: {str(e)}. '
+                f'The file may be corrupted or in an unsupported format.'
+            )
+        return None
 
 
 def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
