@@ -335,12 +335,12 @@ def read_rigaku_raw(
         for open science data management.
     """
     from .rigaku_raw_parser import RigakuRAW4Parser
-    
+
     try:
         # Parse the RAW file - all parameters are extracted from the file
         parser = RigakuRAW4Parser(file_path)
         raw_data = parser.parse()
-        
+
         # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
         # (list of arrays, like XRDML parser does)
         scan_data = {
@@ -350,11 +350,11 @@ def read_rigaku_raw(
             'countTime': None,
             'beamAttenuationFactors': None,
         }
-        
+
         # Detect scan type and modify data accordingly (like other readers)
         scan_type = detect_scan_type(scan_data)
         modified_scan_data = modify_scan_data(scan_data, scan_type)
-        
+
         # Build metadata dictionary
         metadata = {
             'sample_id': raw_data['metadata'].get('sample_id'),
@@ -362,14 +362,14 @@ def read_rigaku_raw(
             'scan_axis': '2Theta',
             'source': {},  # RAW files don't contain source metadata
         }
-        
+
         # Return data in the same format as read_panalytical_xrdml
         return {
             **modified_scan_data,
             'scanmotname': '2Theta',
             'metadata': metadata,
         }
-        
+
     except Exception as e:
         if logger:
             logger.error(
