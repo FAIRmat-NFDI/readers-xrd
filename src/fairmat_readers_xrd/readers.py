@@ -341,28 +341,31 @@ def read_rigaku_raw(
         parser = RigakuRAW4Parser(file_path)
         raw_data = parser.parse()
         
-        # Convert to standard format matching read_panalytical_xrdml output
-        two_theta = np.array(parser.angles) * ureg.degree
-        intensity = np.array(parser.intensities) * ureg.dimensionless
+        # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
+        # (list of arrays, like XRDML parser does)
+        scan_data = {
+            '2Theta': [np.array(parser.angles) * ureg.degree],
+            'intensity': [np.array(parser.intensities) * ureg.dimensionless],
+            'counts': None,
+            'countTime': None,
+            'beamAttenuationFactors': None,
+        }
+        
+        # Detect scan type and modify data accordingly (like other readers)
+        scan_type = detect_scan_type(scan_data)
+        modified_scan_data = modify_scan_data(scan_data, scan_type)
         
         # Build metadata dictionary
         metadata = {
             'sample_id': raw_data['metadata'].get('sample_id'),
-            'scan_type': 'line',  # RAW files are typically 1D scans
+            'scan_type': scan_type,
             'scan_axis': '2Theta',
+            'source': {},  # RAW files don't contain source metadata
         }
-        
-        # Add source metadata if available (RAW files don't typically have this)
-        # But we include the structure for consistency
-        metadata['source'] = {}
         
         # Return data in the same format as read_panalytical_xrdml
         return {
-            '2Theta': [two_theta],  # List of arrays for consistency with XRDML
-            'intensity': [intensity],
-            'counts': None,  # RAW doesn't distinguish counts from intensity
-            'countTime': None,  # Not available in RAW format
-            'beamAttenuationFactors': None,  # Not available in RAW format
+            **modified_scan_data,
             'scanmotname': '2Theta',
             'metadata': metadata,
         }
