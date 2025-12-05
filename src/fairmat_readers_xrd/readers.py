@@ -33,6 +33,7 @@ from fairmat_readers_xrd.utils import (
     modify_scan_data,
 )
 from fairmat_readers_xrd.ikz import RASXfile, BRMLfile
+from fairmat_readers_xrd.rigaku_raw_parser import RigakuRAW4Parser
 
 if TYPE_CHECKING:
     from structlog.stdlib import (
@@ -334,8 +335,6 @@ def read_rigaku_raw(
         Rigaku Corporation. RAW file format is proprietary but reverse-engineered
         for open science data management.
     """
-    from .rigaku_raw_parser import RigakuRAW4Parser
-
     try:
         # Parse the RAW file - all parameters are extracted from the file
         parser = RigakuRAW4Parser(file_path)

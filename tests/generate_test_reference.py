@@ -67,8 +67,8 @@ def generate_reference(raw_file: Path, output_file: Path = None):
         sys.exit(1)
 
     print(f'Successfully read RAW file')
-    print(f"  - Data points: {len(data.get('2Theta', [[]])[0])}")
-    print(f"  - Metadata keys: {list(data.get('metadata', {}).keys())}")
+    print(f'  - Data points: {len(data.get("2Theta", [[]])[0])}')
+    print(f'  - Metadata keys: {list(data.get("metadata", {}).keys())}')
 
     # Convert to JSON-serializable format
     print('Converting to JSON format...')

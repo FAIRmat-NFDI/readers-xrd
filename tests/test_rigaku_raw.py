@@ -25,8 +25,10 @@ Tests the native Python parser for Rigaku binary .raw files, including:
 - Scan parameter completion strategies
 - Integration with paired XRDML files
 """
+
 import os
 import pytest
+from fairmat_readers_xrd import read_panalytical_xrdml
 import numpy as np
 import pint
 
@@ -43,14 +45,14 @@ class TestRigakuRAW4Parser:
     def sample_raw_file(self):
         """
         Fixture providing path to a sample RAW file.
-        
+
         Note: This should be replaced with an actual test file path.
         For CI/CD, a minimal RAW file should be added to tests/data/.
         """
         # This is a placeholder - replace with actual test file
         test_file = 'tests/data/test_sample.raw'
         if not os.path.exists(test_file):
-            pytest.skip(f"Test RAW file not found: {test_file}")
+            pytest.skip(f'Test RAW file not found: {test_file}')
         return test_file
 
     def test_parser_initialization(self):
@@ -71,35 +73,35 @@ class TestRigakuRAW4Parser:
             assert data is not None
         except ValueError as e:
             if 'Invalid RAW file header' in str(e):
-                pytest.fail("Valid RAW file rejected by parser")
+                pytest.fail('Valid RAW file rejected by parser')
 
     def test_metadata_extraction(self, sample_raw_file):
         """Test extraction of metadata from RAW file."""
         parser = RigakuRAW4Parser(sample_raw_file)
         data = parser.parse()
-        
+
         metadata = data['metadata']
         assert isinstance(metadata, dict)
-        
+
         # Check for expected metadata fields
         # Note: Actual fields depend on the test file
         expected_fields = ['date', 'time']
         for field in expected_fields:
-            assert field in metadata, f"Missing metadata field: {field}"
+            assert field in metadata, f'Missing metadata field: {field}'
 
     def test_scan_parameters(self, sample_raw_file):
         """Test extraction of scan parameters."""
         parser = RigakuRAW4Parser(sample_raw_file)
         data = parser.parse()
-        
+
         scan_params = data['scan_params']
         assert isinstance(scan_params, dict)
-        
+
         # Start angle should always be present
         assert 'start_angle' in scan_params
         assert isinstance(scan_params['start_angle'], (int, float))
         assert scan_params['start_angle'] > 0  # Typical XRD range
-        
+
         # Num points should be calculated
         assert 'num_points' in scan_params
         assert isinstance(scan_params['num_points'], int)
@@ -109,15 +111,15 @@ class TestRigakuRAW4Parser:
         """Test extraction of intensity data."""
         parser = RigakuRAW4Parser(sample_raw_file)
         data = parser.parse()
-        
+
         intensities = data['intensities']
         assert intensities is not None
         assert isinstance(intensities, list)
         assert len(intensities) > 0
-        
+
         # Check that intensities are numeric
         assert all(isinstance(x, (int, float)) for x in intensities)
-        
+
         # Check that we have the expected number of points
         assert len(intensities) == data['scan_params']['num_points']
 
@@ -125,10 +127,10 @@ class TestRigakuRAW4Parser:
         """Test setting scan parameters with end angle."""
         parser = RigakuRAW4Parser(sample_raw_file)
         parser.parse()
-        
+
         # Set end angle (typical value)
         parser.set_scan_parameters(end_angle=85.0)
-        
+
         assert parser.scan_params['end_angle'] == 85.0
         assert 'step_size' in parser.scan_params
         assert parser.scan_params['step_size'] > 0
@@ -138,10 +140,10 @@ class TestRigakuRAW4Parser:
         """Test setting scan parameters with step size."""
         parser = RigakuRAW4Parser(sample_raw_file)
         parser.parse()
-        
+
         # Set step size (typical value)
         parser.set_scan_parameters(step_size=0.02)
-        
+
         assert parser.scan_params['step_size'] == 0.02
         assert 'end_angle' in parser.scan_params
         assert parser.scan_params['end_angle'] > parser.scan_params['start_angle']
@@ -152,13 +154,13 @@ class TestRigakuRAW4Parser:
         parser = RigakuRAW4Parser(sample_raw_file)
         parser.parse()
         parser.set_scan_parameters(step_size=0.02)
-        
+
         angles = parser.angles
         assert len(angles) == parser.scan_params['num_points']
-        
+
         # Check that angles are monotonically increasing
-        assert all(angles[i] < angles[i+1] for i in range(len(angles)-1))
-        
+        assert all(angles[i] < angles[i + 1] for i in range(len(angles) - 1))
+
         # Check that first angle matches start angle
         assert angles[0] == pytest.approx(parser.scan_params['start_angle'], rel=1e-6)
 
@@ -171,25 +173,25 @@ class TestReadRigakuRaw:
         """Fixture providing path to a sample RAW file."""
         test_file = 'tests/data/test_sample.raw'
         if not os.path.exists(test_file):
-            pytest.skip(f"Test RAW file not found: {test_file}")
+            pytest.skip(f'Test RAW file not found: {test_file}')
         return test_file
 
     def test_read_function_returns_dict(self, sample_raw_file):
         """Test that read_rigaku_raw returns a properly structured dictionary."""
         output = read_rigaku_raw(sample_raw_file)
-        
+
         assert output is not None
         assert isinstance(output, dict)
-        
+
         # Check required keys
         required_keys = ['2Theta', 'intensity', 'metadata', 'scanmotname']
         for key in required_keys:
-            assert key in output, f"Missing required key: {key}"
+            assert key in output, f'Missing required key: {key}'
 
     def test_data_has_units(self, sample_raw_file):
         """Test that numerical data has proper pint units."""
         output = read_rigaku_raw(sample_raw_file)
-        
+
         # Check 2Theta has units
         assert isinstance(output['2Theta'], list)
         if len(output['2Theta']) > 0:
@@ -197,7 +199,7 @@ class TestReadRigakuRaw:
             assert hasattr(output['2Theta'][0], 'units')
             # Should be in degrees
             assert str(output['2Theta'][0].units) == 'degree'
-        
+
         # Check intensity has units
         assert isinstance(output['intensity'], list)
         if len(output['intensity']) > 0:
@@ -209,14 +211,14 @@ class TestReadRigakuRaw:
     def test_metadata_structure(self, sample_raw_file):
         """Test that metadata has the expected structure."""
         output = read_rigaku_raw(sample_raw_file)
-        
+
         metadata = output['metadata']
         assert isinstance(metadata, dict)
-        
+
         # Should have these keys
         assert 'scan_type' in metadata
         assert 'scan_axis' in metadata
-        
+
         # scan_type should be 'line' for 1D scans
         assert metadata['scan_type'] in ['line', 'rsm']
 
@@ -225,15 +227,15 @@ class TestReadRigakuRaw:
         # Create a dummy XRDML file to test detection
         base_name = os.path.splitext(sample_raw_file)[0]
         xrdml_file = f'{base_name}.xrdml'
-        
+
         if os.path.exists(xrdml_file):
             # If XRDML exists, parameters should be more accurate
             output = read_rigaku_raw(sample_raw_file)
-            
+
             # Should have completed scan parameters
             assert len(output['2Theta']) > 0
             angles = output['2Theta'][0].magnitude
-            
+
             # Check that angles span a reasonable range (not just default)
             angle_range = angles[-1] - angles[0]
             assert angle_range > 1.0  # At least 1 degree range
@@ -243,10 +245,10 @@ class TestReadRigakuRaw:
         # Temporarily check if XRDML exists
         base_name = os.path.splitext(sample_raw_file)[0]
         xrdml_file = f'{base_name}.xrdml'
-        
+
         if not os.path.exists(xrdml_file):
             output = read_rigaku_raw(sample_raw_file)
-            
+
             # Should still return valid data with default step
             assert output is not None
             assert len(output['2Theta']) > 0
@@ -258,15 +260,13 @@ class TestRigakuRawIntegration:
 
     def test_output_compatible_with_xrdml_format(self):
         """Test that RAW output matches XRDML output structure."""
-        from fairmat_readers_xrd import read_panalytical_xrdml
-        
         # Get a sample XRDML output structure
         xrdml_file = 'tests/data/XRD-918-16_10.xrdml'
         if not os.path.exists(xrdml_file):
-            pytest.skip("Reference XRDML file not found")
-        
+            pytest.skip('Reference XRDML file not found')
+
         xrdml_output = read_panalytical_xrdml(xrdml_file)
-        
+
         # Check that RAW output would have same keys
         expected_keys = ['2Theta', 'intensity', 'metadata', 'scanmotname']
         for key in expected_keys:
@@ -277,10 +277,10 @@ class TestRigakuRawIntegration:
         if sample_raw_file is None:
             sample_raw_file = 'tests/data/test_sample.raw'
         if not os.path.exists(sample_raw_file):
-            pytest.skip(f"Test RAW file not found: {sample_raw_file}")
-        
+            pytest.skip(f'Test RAW file not found: {sample_raw_file}')
+
         output = read_rigaku_raw(sample_raw_file)
-        
+
         # All data arrays should have same length
         if len(output['2Theta']) > 0 and len(output['intensity']) > 0:
             assert len(output['2Theta'][0]) == len(output['intensity'][0])
@@ -291,14 +291,14 @@ class TestRigakuRawIntegration:
 def test_different_step_sizes(step_size):
     """Test parser with different step sizes."""
     # This would need actual RAW files with different step sizes
-    pytest.skip("Requires multiple RAW files with different step sizes")
+    pytest.skip('Requires multiple RAW files with different step sizes')
 
 
 @pytest.mark.parametrize('scan_range', [(10, 80), (20, 100), (5, 90)])
 def test_different_scan_ranges(scan_range):
     """Test parser with different scan ranges."""
     # This would need actual RAW files with different ranges
-    pytest.skip("Requires multiple RAW files with different scan ranges")
+    pytest.skip('Requires multiple RAW files with different scan ranges')
 
 
 if __name__ == '__main__':
