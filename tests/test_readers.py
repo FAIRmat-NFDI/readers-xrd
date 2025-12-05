@@ -128,9 +128,7 @@ def test_rigaku_raw_reader():
 
         # Validate units (should be pint Quantities)
         if len(output['2Theta']) > 0:
-            assert hasattr(output['2Theta'][0], 'magnitude'), (
-                '2Theta should have units'
-            )
+            assert hasattr(output['2Theta'][0], 'magnitude'), '2Theta should have units'
             assert hasattr(output['2Theta'][0], 'units'), '2Theta should have units'
 
         if len(output['intensity']) > 0:
