@@ -63,6 +63,8 @@ def read_file(file_path: str) -> dict:
         return read_panalytical_xrdml(file_path)
     if file_path.endswith('.brml'):
         return read_bruker_brml(file_path)
+    if file_path.endswith('.raw'):
+        return read_rigaku_raw(file_path)
     raise NotImplementedError('Unknown file type.')
 
 
@@ -355,17 +357,21 @@ def read_rigaku_raw(
         modified_scan_data = modify_scan_data(scan_data, scan_type)
 
         # Build metadata dictionary
+        # Extract scan axis from raw data (e.g., "Theta")
+        scan_axis = raw_data['scan_params'].get('scan_axis', '')
+
         metadata = {
             'sample_id': raw_data['metadata'].get('sample_id'),
             'scan_type': scan_type,
-            'scan_axis': '2Theta',
+            'scan_axis': scan_axis,  # Extracted from RAW file at offset 0x04D0
             'source': {},  # RAW files don't contain source metadata
         }
 
         # Return data in the same format as read_panalytical_xrdml
+        # Use scan_axis as scanmotname (e.g., "Theta")
         return {
             **modified_scan_data,
-            'scanmotname': '2Theta',
+            'scanmotname': scan_axis,  # Extracted from RAW file at offset 0x04D0
             'metadata': metadata,
         }
 

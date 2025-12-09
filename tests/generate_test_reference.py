@@ -46,7 +46,15 @@ def convert_quantity_to_string(obj):
 
 def generate_reference(raw_file: Path, output_file: Path = None):
     """
-    Generate reference JSON from a RAW file.
+    Generate reference JSON from a RAW file for regression testing.
+
+    This function creates a JSON file containing the expected output of read_rigaku_raw().
+    The reference JSON is used in test_rigaku_raw.py to ensure the parser output
+    remains consistent across code changes (regression testing).
+
+    Args:
+        raw_file: Path to the input .raw file
+        output_file: Optional path for output JSON (defaults to input_name.json)
 
     Args:
         raw_file: Path to input RAW file

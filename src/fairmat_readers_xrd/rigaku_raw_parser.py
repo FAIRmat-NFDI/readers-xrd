@@ -1,10 +1,16 @@
 """
-Pure Python parser for Rigaku RAW 4.00 X-ray diffraction files.
+Pure Python parser for Siemens/Bruker RAW v4 X-ray diffraction files.
 
-This module provides native Python parsing of Rigaku's proprietary binary .raw
-format without requiring external tools, Wine, or .NET libraries.
+**IMPORTANT NAMING NOTE**: This module is named "rigaku_raw_parser" for historical
+reasons, but it actually parses **Bruker/Siemens RAW v4** format files (magic header
+"RAW4.00"), NOT Rigaku format files. The naming will be corrected in a future version
+to avoid confusion.
 
-Based on reverse engineering of RAW 4.00 file structure.
+This module provides native Python parsing of the Siemens/Bruker proprietary binary
+.raw format without requiring external tools, Wine, or .NET libraries.
+
+Based on reverse engineering of RAW v4 file structure from example files.
+Validated on Bruker DIFFRAC.EVA generated single-axis powder diffraction scans.
 
 Author: Generated for NOMAD
 License: MIT
@@ -18,13 +24,25 @@ import logging
 
 class RigakuRAW4Parser:
     """
-    Parser for Rigaku RAW version 4.00 binary files.
+    Parser for Siemens/Bruker RAW v4 binary files (single-axis powder diffraction).
 
-    File Structure (RAW 4.00):
+    IMPORTANT SCOPE LIMITATION:
+    This parser is designed for SINGLE-AXIS theta-2theta powder diffraction scans.
+    It extracts one scan axis (typically "Theta") and assumes a standard 1D scan geometry.
+
+    NOT SUPPORTED (without validation):
+    - Multi-axis scans (texture, pole figures, reciprocal space maps)
+    - Non-standard scan geometries
+    - Extraction of additional goniometer angles (omega, chi, phi) if present
+
+    File Structure (RAW v4):
     - Header: 8 bytes ("RAW4.00\x00")
     - Metadata blocks with tags (USER, SITE, SAMPLEID, COMMENT, CREATOR)
-    - Measurement parameters (start angle, step, count, etc.)
-    - Intensity data (float array)
+    - Measurement parameters (start angle, step, count, scan axis name, etc.)
+    - Intensity data (appears as interleaved float32 pairs in tested files)
+
+    Note: Format is proprietary and not fully documented. Offsets and structure
+    are reverse-engineered from example files and may not generalize to all RAW v4 variants.
     """
 
     HEADER_MAGIC = b'RAW4.00\x00'
@@ -62,7 +80,17 @@ class RigakuRAW4Parser:
 
         Raises:
             ValueError: If file format is invalid
+
+        Warnings:
+            Logs warning about single-axis limitation - multi-axis scans may not be correctly parsed
         """
+        # Log scope limitation warning
+        self.logger.warning(
+            'RAW v4 parser designed for single-axis theta-2theta scans. '
+            'Multi-axis scans (texture, pole figures) may not be correctly parsed. '
+            'Additional goniometer angles (omega, chi, phi) are not extracted.'
+        )
+
         with open(self.filepath, 'rb') as f:
             # Read entire file
             full_data = f.read()
@@ -178,6 +206,17 @@ class RigakuRAW4Parser:
             self.logger.info(f'Start angle: {start_angle}°')
         except Exception as e:
             self.logger.error(f'Could not read start angle at 0x04fb: {e}')
+
+        try:
+            # Read scan axis name from fixed offset (null-terminated ASCII string)
+            # At offset 0x04D0 we find the axis name (e.g., "Theta")
+            axis_bytes = data[0x04D0:0x04E0]
+            axis_name = axis_bytes.split(b'\x00')[0].decode('ascii', errors='ignore').strip()
+            if axis_name:
+                self.scan_params['scan_axis'] = axis_name
+                self.logger.info(f'Scan axis: {axis_name}')
+        except Exception as e:
+            self.logger.error(f'Could not read scan axis at 0x04d0: {e}')
             start_angle = None
 
         # Calculate end angle if we have all required parameters

@@ -27,12 +27,14 @@ data_dict =  read_panalytical_xrdml(file_path)
 
 Currently, the following file extensions are supported:
 
-| File Extension    | Corresponding Reader Function     |
-| ----------------- | --------------------------------- |
-| `.xrdml`          | `read_panalytical_xrdml`          |
-| `.rasx`           | `read_rigaku_rasx`                |
-| `.brml`           | `read_bruker_brml`                |
-| `.raw`            | `read_rigaku_raw`                 |
+| File Extension    | Corresponding Reader Function     | Notes                                    |
+| ----------------- | --------------------------------- | ---------------------------------------- |
+| `.xrdml`          | `read_panalytical_xrdml`          |                                          |
+| `.rasx`           | `read_rigaku_rasx`                |                                          |
+| `.brml`           | `read_bruker_brml`                |                                          |
+| `.raw`            | `read_rigaku_raw`                 | Siemens/Bruker RAW v4, single-axis scans only |
+
+**Note on `.raw` files**: The parser supports Siemens/Bruker RAW v4 format for single-axis theta-2theta powder diffraction scans. Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
 
 ## Development
 The package is still under development. To contribute, start with simply raising an

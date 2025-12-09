@@ -121,6 +121,10 @@ def test_rigaku_raw_reader():
         assert 'metadata' in output, 'Missing metadata'
         assert 'scanmotname' in output, 'Missing scanmotname'
 
+        # Validate extracted scan axis
+        assert output['scanmotname'] == 'Theta', f"Expected scanmotname='Theta', got '{output['scanmotname']}'"
+        assert output['metadata']['scan_axis'] == 'Theta', f"Expected scan_axis='Theta', got '{output['metadata']['scan_axis']}'"
+
         # Validate data types
         assert isinstance(output['2Theta'], list), '2Theta should be a list'
         assert isinstance(output['intensity'], list), 'intensity should be a list'

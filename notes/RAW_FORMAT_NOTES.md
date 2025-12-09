@@ -1,8 +1,10 @@
-# Rigaku RAW 4.00 Format - Reverse Engineering Documentation
+# Siemens/Bruker RAW v4 Format - Reverse Engineering Documentation
 
 ## Summary
 
-Successfully reverse-engineered the **complete** Rigaku RAW 4.00 binary format! All scan parameters (start_angle, step_size, num_points) are extracted directly from the file. **Zero external dependencies** - no Wine, no Mono, no .NET, and **no XRDML files required**!
+Successfully reverse-engineered sufficient structure of the **Siemens/Bruker RAW v4** format to extract scan parameters (start_angle, step_size, num_points) and intensities for **single-axis (theta-2theta) powder diffraction scans**. **Zero external dependencies** - no Wine, no Mono, no .NET, and **no XRDML files required** for basic scan reconstruction!
+
+**Important**: This parser is designed for **single-axis powder diffraction scans** (standard theta-2theta). Multi-axis scans, texture measurements, or other advanced scan types may not be correctly parsed.
 
 ## Format Structure
 
@@ -21,30 +23,33 @@ Offset  Size  Type      Description
 ...     ...   ...       (more parameters)
 0x020F  8     float64   ⭐ Step size (degrees)
 ...     ...   ...       (more parameters)
+0x04D0  var   ASCII     ⭐ Scan axis name (null-terminated, e.g., "Theta")
+...     ...   ...       (more parameters)
 0x04FB  8     float64   ⭐ Start angle (degrees)
-0x04D0  var   ASCII     "Theta" label (axis name)
 0x051F  var   float32[] ⭐ Intensity data (see below)
 ```
 
-### Key Discoveries
+### Key Discoveries (Based on Tested Sample Files)
 
 1. **Start Angle Location**: `0x04FB` (8 bytes, little-endian `float64`)
    - Example: `10.0°` stored as `00 00 00 00 00 24 40 00`
+   - **Note**: This offset is validated for our test files; may vary with different header sizes
 
 2. **Data Section Start**: `0x051F` (1311 bytes from file start)
-   - **IMPORTANT**: This offset appears fixed for RAW 4.00 format
+   - **Note**: This offset appears consistent for tested single-axis scans but may vary for multi-dataset or multi-axis RAW files
 
-3. **Intensity Data Format**: Interleaved `float32` pairs
+3. **Intensity Data Format**: In our test files, data appears as interleaved `float32` pairs
    ```
-   Pattern: [intensity1, unknown1, intensity2, unknown2, ...]
+   Observed pattern: [value1, value2, value3, value4, ...]
    ```
    - Each data point = 8 bytes (2 × `float32`)
-   - Parser extracts every other `float32` value (the intensities)
-   - The "unknown" values appear related but are not used
+   - Parser extracts every other `float32` value (matches XRDML intensities exactly)
+   - The role of interleaved values is unclear and may be format-dependent
+   - **Note**: Other RAW v4 parsers typically don't mention this structure; needs validation on more files
 
-4. **Number of Points**: Calculated from file structure
+4. **Number of Points**: Extracted from file structure
    ```python
-   num_points = (file_size - 0x051F) // 8
+   num_points = struct.unpack('<H', data[0x01C3:0x01C5])[0]  # uint16 at 0x01C3
    ```
 
 5. **All Critical Parameters Found!** ✅
@@ -52,30 +57,39 @@ Offset  Size  Type      Description
    - ✅ Step size: Stored at `0x020F` (float64)
    - ✅ Number of points: Stored at `0x01C3` (uint16)
    - ✅ End angle: **Calculated** as `start + (num_points - 1) × step`
+   - ✅ Scan axis name: Stored at `0x04D0` (null-terminated ASCII string, e.g., "Theta")
 
-6. **Parameters NOT in RAW File** ⚠️
+6. **Parameters NOT Available in Tested Files** ⚠️
 
-   The following are **NOT stored** in the RAW binary format:
+   The following parameters are **not reliably extractable** from the tested RAW v4 files:
 
    - **Wavelength data** (K-alpha1, K-alpha2, K-beta values)
-     - powDLL adds defaults when converting to XRDML (Cu K-alpha: 1.5406Å, etc.)
-     - XRDML comment: `<!--KBeta value not accurate but needed by the xrdml format. Please change.-->`
+     - Not found as obvious header fields in tested files
+     - powDLL uses defaults (Cu K-alpha: 1.5406Å, etc.) when converting to XRDML
+     - XRDML comment indicates: "KBeta value not accurate but needed by the xrdml format"
 
    - **Count time / Integration time**
+     - Not found in tested files in documented locations
      - powDLL defaults to 1.0 second when converting to XRDML
-     - XRDML comment: `<!--Time is not accurate but needed by the xrdml format. Please change.-->`
+     - XRDML comment indicates: "Time is not accurate but needed by the xrdml format"
 
-   - **Goniometer angles** (Omega, Chi, Phi)
-     - Not applicable for standard line scans
+   - **Additional goniometer angles** (Omega, Chi, Phi)
+     - For tested **single-axis theta-2theta scans**, only one scan axis name is present ("Theta")
+     - Strings "Omega", "Chi", "Phi" do not appear in tested files
+     - **Scope limitation**: Multi-axis scans (texture, pole figures) may contain additional angle information in undocumented header fields
+     - Without multi-axis example files, we cannot verify if/how such data would be encoded
 
    - **Scan mode** (Continuous vs Step)
+     - Not found in documented header fields
      - powDLL may infer from other parameters or default to "Continuous"
 
-   These values are **required by the XRDML format specification** but are **NOT present** in the RAW file. powDLL adds them as defaults or assumptions during conversion. Binary searches of the RAW file confirmed these values do not appear anywhere in the file.
+   **Note**: These parameters are required by XRDML format specification. Tools like powDLL add them as defaults or from user input when converting. We did not find these as ASCII strings or obvious binary encodings in the tested files, but cannot rule out their presence in undocumented header sections or for different scan types.
 
 ## Validation Results
 
-Tested on sample file: `HeOx-1001-nsp-sps-900C-10min-01-poliert_exported.raw`
+**Tested on**: Single-axis theta-2theta powder diffraction scans
+**Example file**: `HeOx-1001-nsp-sps-900C-10min-01-poliert_exported.raw` (generated by DIFFRAC.EVA)
+**Format**: Siemens/Bruker RAW v4 (magic header: `RAW4.00\x00`)
 
 ### Extracted Data
 - ✅ Start angle: `10.0°`
@@ -88,27 +102,34 @@ Tested on sample file: `HeOx-1001-nsp-sps-900C-10min-01-poliert_exported.raw`
 - ✅ Step size: `0.0105202999°` (directly from file at offset 0x020F)
 - ✅ Number of points: `7134` (directly from file at offset 0x01C3)
 - ✅ End angle: `85.041299°` (calculated: start + (num_points - 1) × step)
+- ✅ Scan axis: `"Theta"` (directly from file at offset 0x04D0)
 
-### Parameters NOT in RAW File (powDLL Defaults)
+### Parameters NOT Available in Test Files
 - ❌ Wavelength (K-alpha1: 1.5406Å, K-alpha2: 1.54439Å, K-beta: 1.39225Å)
-  - powDLL uses Cu K-alpha defaults required by XRDML format
-  - Binary search confirmed: these values do NOT appear in RAW file
+  - powDLL uses Cu K-alpha defaults for XRDML format
+  - Not found as ASCII strings or obvious binary patterns in tested files
 - ❌ Count time / Integration time (1.0 second)
   - powDLL default added for XRDML format compliance
-  - Binary search confirmed: value NOT in RAW file
+  - Not found in tested files
+- ❌ Additional goniometer angles (Omega, Chi, Phi)
+  - Tested single-axis scans contain only one scan axis ("Theta")
+  - Multi-axis scan support unknown without example files
 - ❌ Scan mode (Continuous)
   - Inferred or defaulted by powDLL during conversion
 
 ## Usage Example
 
+**Note**: The parser class and function names reference "Rigaku" for historical reasons, but actually parse **Bruker/Siemens RAW v4** format files. The naming will be corrected in a future version.
+
 ```python
 from fairmat_readers_xrd.rigaku_raw_parser import RigakuRAW4Parser
 
-# Parse RAW file - ALL parameters extracted automatically
+# Parse Bruker RAW v4 file - ALL parameters extracted automatically
 parser = RigakuRAW4Parser('data.raw')
 data = parser.parse()
 
 # Access ALL parsed data (no external files needed!)
+print(f"Scan axis: {data['scan_params']['scan_axis']}")
 print(f"Start angle: {data['scan_params']['start_angle']}°")
 print(f"End angle: {data['scan_params']['end_angle']}°")
 print(f"Step size: {data['scan_params']['step_size']}°")
@@ -148,20 +169,29 @@ Successfully extracted:
 - ✅ Sample ID: `HeOx-1001-nsp-sps-900C-10min-01-poliert`
 - ✅ Creator: `DIFFRAC.EVA`
 
-## Limitations
+## Limitations and Scope
 
-1. **Missing Metadata**: Some metadata fields not stored in RAW file
-   - Wavelength data (powDLL uses Cu K-alpha defaults)
-   - Count/integration time (powDLL defaults to 1.0 second)
-   - Scan mode (powDLL infers "Continuous")
-   - These are added by powDLL when converting to XRDML format
+1. **Single-Axis Scans Only**: Parser designed for standard theta-2theta powder diffraction
+   - **Not validated for**: Multi-axis scans (texture, pole figures, RSM), non-standard geometries
+   - **Unknown**: Whether multi-axis angle information (omega, chi, phi) is encoded in undocumented header fields
+   - **Recommendation**: For complex scan types, verify output or use vendor software
 
-2. **Single Format Support**: Only RAW 4.00 tested
-   - Earlier versions (3.00, 2.00, 1.00) may have different offsets
-   - Format detection logic needed for multi-version support
+2. **Missing Metadata**: Some parameters not reliably extractable from tested files
+   - Wavelength data (not found in documented locations)
+   - Count/integration time (not found in documented locations)
+   - Scan mode (not found in documented locations)
+   - **Recommendation**: Provide these via sidecar metadata or instrument configuration files
 
-3. **Fixed Data Offset**: Assumes data starts at `0x051F`
-   - May need dynamic detection for other scan types or configurations
+3. **Limited File Coverage**: Validated on specific RAW v4 files
+   - Tested: Bruker/DIFFRAC.EVA generated single-axis scans
+   - Earlier versions (v3, v2, v1) may have different structures
+   - Multi-dataset RAW files may have different offsets
+   - **Recommendation**: Test parser on your specific file types before production use
+
+4. **Proprietary Format**: Siemens/Bruker RAW v4 is not publicly documented
+   - Offsets and structure reverse-engineered from examples
+   - May not generalize to all RAW v4 variants
+   - **Recommendation**: Maintain XRDML workflow as fallback for critical data
 
 ## Key Features
 
@@ -182,10 +212,11 @@ Our pure Python parser provides:
 4. **Enhanced Metadata**: Extract additional metadata fields from binary structure
 5. **Error Handling**: Improve robustness for corrupted files
 
-## RAW vs XRDML: Data Source Comparison
+## RAW v4 vs XRDML: Data Source Comparison (Single-Axis Scans)
 
-### Data in RAW File (Extracted by Parser)
-✅ **Scan Parameters** (complete):
+### Data in RAW v4 File (Extracted by Parser)
+✅ **Scan Parameters** (for single-axis scans):
+- Scan axis name: `"Theta"`
 - Start angle: `10.0°`
 - Step size: `0.0105202999°`
 - Number of points: `7134`
@@ -193,7 +224,7 @@ Our pure Python parser provides:
 
 ✅ **Intensity Data** (complete):
 - All 7134 intensity values
-- 100% match with XRDML data
+- 100% match with XRDML data for tested files
 
 ✅ **Metadata** (partial):
 - Date: `04/07/2025`
@@ -202,6 +233,8 @@ Our pure Python parser provides:
 - Site: `Germany`
 - Sample ID: `HeOx-1001-nsp-sps-900C-10min-01-poliert`
 - Creator: `DIFFRAC.EVA`
+
+**Scope**: Tested on single-axis theta-2theta powder diffraction scans only
 
 ### Data Added by powDLL During XRDML Conversion
 ❌ **NOT in RAW file** - powDLL adds these as defaults:
@@ -220,18 +253,20 @@ Our pure Python parser provides:
 **Scan Configuration**:
 - Scan mode: `Continuous` (inferred or default)
 - Scan axis: `Gonio` (inferred from instrument type)
+- Additional angles (omega, chi, phi): Not applicable for standard theta-2theta scans
 
 ### Verification Method
-Binary searches performed on RAW file for all XRDML values:
+ASCII string searches performed on tested RAW files:
 ```bash
-# Searched for wavelength values (float32, float64, ASCII)
-grep -abo "1.5406" file.raw    # NOT FOUND
-grep -abo "1.54439" file.raw   # NOT FOUND
-grep -abo "1.39225" file.raw   # NOT FOUND
-
-# Searched for count time value
-grep -abo "1.0" file.raw       # NOT FOUND (in expected context)
+# Searched for wavelength values and angle names as ASCII strings
+grep -ao "1.5406" file.raw     # NOT FOUND
+grep -ao "Omega" file.raw      # NOT FOUND
+grep -ao "Chi" file.raw        # NOT FOUND
+grep -ao "Phi" file.raw        # NOT FOUND
+strings file.raw | grep -i omega  # NOT FOUND
 ```
 
-**Conclusion**: The RAW file contains all essential scan data (angles, step size, intensities). powDLL adds instrument metadata (wavelengths, timing) as defaults required by the XRDML format specification, but these are NOT extracted from the RAW file - they are assumptions based on typical Cu K-alpha X-ray sources.
+**Note**: These searches only check for ASCII representations. Binary-encoded values (IEEE floats, integers) were not systematically scanned. The absence of these parameters in tested files does not definitively prove they are never present in any RAW v4 file.
+
+**Conclusion**: For the tested single-axis theta-2theta scans, the RAW v4 file contains all essential scan data (scan axis name, angles, step size, intensities). powDLL adds instrument metadata (wavelengths, integration time, scan mode) as defaults or from user input when converting to XRDML. These parameters were not found as obvious ASCII or documented fields in the tested files. Multi-axis scan support (texture, pole figures) remains unvalidated without example files.
 

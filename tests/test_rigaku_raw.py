@@ -107,6 +107,10 @@ class TestRigakuRAW4Parser:
         assert isinstance(scan_params['num_points'], int)
         assert scan_params['num_points'] > 0
 
+        # Scan axis should be extracted from file
+        assert 'scan_axis' in scan_params
+        assert scan_params['scan_axis'] == 'Theta'  # Expected value for test file
+
     def test_intensity_extraction(self, sample_raw_file):
         """Test extraction of intensity data."""
         parser = RigakuRAW4Parser(sample_raw_file)
