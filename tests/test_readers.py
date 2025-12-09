@@ -26,7 +26,7 @@ from fairmat_readers_xrd import (
     read_panalytical_xrdml,
     read_rigaku_rasx,
     read_bruker_brml,
-    read_rigaku_raw,
+    read_bruker_raw,
 )
 
 ureg = pint.get_application_registry()
@@ -92,9 +92,9 @@ def test_brml_reader():
         assert output == reference
 
 
-def test_rigaku_raw_reader():
+def test_bruker_raw_reader():
     """
-    Test the Rigaku RAW parser with a sample file.
+    Test the Bruker/Siemens RAW v4 parser with a sample file.
 
     This test validates:
     - Binary file parsing
@@ -112,33 +112,39 @@ def test_rigaku_raw_reader():
         return
 
     try:
-        output = read_rigaku_raw(test_raw)
+        output = read_bruker_raw(test_raw)
 
         # Validate structure
-        assert output is not None, 'read_rigaku_raw returned None'
+        assert output is not None, 'read_bruker_raw returned None'
         assert '2Theta' in output, 'Missing 2Theta data'
         assert 'intensity' in output, 'Missing intensity data'
         assert 'metadata' in output, 'Missing metadata'
         assert 'scanmotname' in output, 'Missing scanmotname'
 
         # Validate extracted scan axis
-        assert output['scanmotname'] == 'Theta', f"Expected scanmotname='Theta', got '{output['scanmotname']}'"
-        assert output['metadata']['scan_axis'] == 'Theta', f"Expected scan_axis='Theta', got '{output['metadata']['scan_axis']}'"
+        assert (
+            output['scanmotname'] == 'Theta'
+        ), f"Expected scanmotname='Theta', got '{output['scanmotname']}'"
+        assert (
+            output['metadata']['scan_axis'] == 'Theta'
+        ), f"Expected scan_axis='Theta', got '{output['metadata']['scan_axis']}'"
 
         # Validate data types
-        assert isinstance(output['2Theta'], list), '2Theta should be a list'
-        assert isinstance(output['intensity'], list), 'intensity should be a list'
+        assert hasattr(
+            output['2Theta'], 'magnitude'
+        ), '2Theta should be a pint Quantity'
+        assert hasattr(output['2Theta'], 'units'), '2Theta should have units'
+        assert hasattr(
+            output['intensity'], 'magnitude'
+        ), 'intensity should be a pint Quantity'
+        assert hasattr(output['intensity'], 'units'), 'intensity should have units'
         assert isinstance(output['metadata'], dict), 'metadata should be a dict'
 
-        # Validate units (should be pint Quantities)
-        if len(output['2Theta']) > 0:
-            assert hasattr(output['2Theta'][0], 'magnitude'), '2Theta should have units'
-            assert hasattr(output['2Theta'][0], 'units'), '2Theta should have units'
-
-        if len(output['intensity']) > 0:
-            assert hasattr(output['intensity'][0], 'magnitude'), (
-                'intensity should have units'
-            )
+        # Validate that the data arrays have content
+        assert len(output['2Theta'].magnitude) > 0, '2Theta should contain data points'
+        assert (
+            len(output['intensity'].magnitude) > 0
+        ), 'intensity should contain data points'
 
         # Test with reference JSON if it exists
         if os.path.exists(f'{test_raw}.json'):

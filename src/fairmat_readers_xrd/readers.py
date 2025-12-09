@@ -33,7 +33,7 @@ from fairmat_readers_xrd.utils import (
     modify_scan_data,
 )
 from fairmat_readers_xrd.ikz import RASXfile, BRMLfile
-from fairmat_readers_xrd.rigaku_raw_parser import RigakuRAW4Parser
+from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 
 if TYPE_CHECKING:
     from structlog.stdlib import (
@@ -64,7 +64,7 @@ def read_file(file_path: str) -> dict:
     if file_path.endswith('.brml'):
         return read_bruker_brml(file_path)
     if file_path.endswith('.raw'):
-        return read_rigaku_raw(file_path)
+        return read_bruker_raw(file_path)
     raise NotImplementedError('Unknown file type.')
 
 
@@ -310,18 +310,18 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     }
 
 
-def read_rigaku_raw(
+def read_bruker_raw(
     file_path: str, logger: 'BoundLogger' = None
 ) -> Optional[Dict[str, Any]]:
     """
-    Read Rigaku binary .raw files using native Python parser.
+    Read Bruker/Siemens RAW v4 binary files using native Python parser.
 
-    This function parses Rigaku RAW 4.00 binary files directly without requiring
-    external conversion tools. All scan parameters (start_angle, step_size, num_points)
-    are extracted directly from the binary file.
+    This function parses Bruker RAW v4 (magic header "RAW4.00") binary files directly
+    without requiring external conversion tools. All scan parameters (start_angle,
+    step_size, num_points, scan_axis) are extracted directly from the binary file.
 
     Args:
-        file_path (str): Path to the Rigaku .raw file.
+        file_path (str): Path to the Bruker .raw file.
         logger (BoundLogger, optional): Logger instance for warnings/errors.
 
     Returns:
@@ -329,17 +329,19 @@ def read_rigaku_raw(
                                schema, or None if parsing fails.
 
     Note:
-        - Only RAW 4.00 format is currently supported
+        - Only RAW v4 format is currently supported
+        - Designed for single-axis theta-2theta powder diffraction scans
+        - Multi-axis scans (texture, pole figures) may not parse correctly
         - All scan parameters are extracted from the binary file
         - No external files (.xrdml) are required
 
     Citation for RAW format understanding:
-        Rigaku Corporation. RAW file format is proprietary but reverse-engineered
-        for open science data management.
+        Siemens/Bruker RAW format is proprietary but reverse-engineered
+        for open science data management. Based on DIFFRAC.EVA output files.
     """
     try:
         # Parse the RAW file - all parameters are extracted from the file
-        parser = RigakuRAW4Parser(file_path)
+        parser = BrukerRAW4Parser(file_path)
         raw_data = parser.parse()
 
         # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
@@ -378,7 +380,7 @@ def read_rigaku_raw(
     except Exception as e:
         if logger:
             logger.error(
-                f'Failed to parse Rigaku .raw file {file_path}: {str(e)}. '
+                f'Failed to parse Bruker/Siemens .raw file {file_path}: {str(e)}. '
                 f'The file may be corrupted or in an unsupported format.'
             )
         return None

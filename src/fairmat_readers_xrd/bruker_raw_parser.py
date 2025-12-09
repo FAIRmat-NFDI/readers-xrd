@@ -1,13 +1,8 @@
 """
 Pure Python parser for Siemens/Bruker RAW v4 X-ray diffraction files.
 
-**IMPORTANT NAMING NOTE**: This module is named "rigaku_raw_parser" for historical
-reasons, but it actually parses **Bruker/Siemens RAW v4** format files (magic header
-"RAW4.00"), NOT Rigaku format files. The naming will be corrected in a future version
-to avoid confusion.
-
 This module provides native Python parsing of the Siemens/Bruker proprietary binary
-.raw format without requiring external tools, Wine, or .NET libraries.
+.raw format (magic header "RAW4.00") without requiring external tools, Wine, or .NET libraries.
 
 Based on reverse engineering of RAW v4 file structure from example files.
 Validated on Bruker DIFFRAC.EVA generated single-axis powder diffraction scans.
@@ -22,7 +17,7 @@ from typing import Dict, Any, Optional, Tuple
 import logging
 
 
-class RigakuRAW4Parser:
+class BrukerRAW4Parser:
     """
     Parser for Siemens/Bruker RAW v4 binary files (single-axis powder diffraction).
 
@@ -268,7 +263,7 @@ class RigakuRAW4Parser:
         if not self.intensities or not self.angles:
             raise ValueError('No data parsed. Call parse() first.')
 
-        lines = ['# Rigaku RAW 4.00 converted to XY format']
+        lines = ['# Bruker/Siemens RAW v4 converted to XY format']
         lines.append(f'# Sample: {self.metadata.get("sample_id", "Unknown")}')
         lines.append(
             f'# Date: {self.metadata.get("date", "")} {self.metadata.get("time", "")}'
@@ -285,9 +280,9 @@ class RigakuRAW4Parser:
         return '\n'.join(lines)
 
 
-def read_rigaku_raw4(filepath: str) -> Dict[str, Any]:
+def read_bruker_raw4(filepath: str) -> Dict[str, Any]:
     """
-    Read a Rigaku RAW 4.00 file.
+    Read a Bruker/Siemens RAW v4 file.
 
     Args:
         filepath: Path to .raw file
@@ -296,17 +291,17 @@ def read_rigaku_raw4(filepath: str) -> Dict[str, Any]:
         Dictionary with 'metadata', 'scan_params', 'intensities', 'angles'
 
     Example:
-        >>> data = read_rigaku_raw4('sample.raw')
+        >>> data = read_bruker_raw4('sample.raw')
         >>> print(data['metadata']['sample_id'])
         >>> print(len(data['intensities']))
     """
-    parser = RigakuRAW4Parser(filepath)
+    parser = BrukerRAW4Parser(filepath)
     return parser.parse()
 
 
 def convert_raw_to_xy(raw_filepath: str, xy_filepath: Optional[str] = None) -> str:
     """
-    Convert Rigaku .raw file to simple XY format.
+    Convert Bruker RAW v4 .raw file to simple XY format.
 
     Args:
         raw_filepath: Path to input .raw file
@@ -315,7 +310,7 @@ def convert_raw_to_xy(raw_filepath: str, xy_filepath: Optional[str] = None) -> s
     Returns:
         Path to created XY file
     """
-    parser = RigakuRAW4Parser(raw_filepath)
+    parser = BrukerRAW4Parser(raw_filepath)
     parser.parse()
 
     xy_content = parser.to_xy_format()

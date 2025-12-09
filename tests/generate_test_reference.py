@@ -6,7 +6,7 @@ Usage:
     python generate_test_reference.py input.raw [output.json]
 
 This script reads a RAW file and generates a reference JSON that can be used
-for regression testing. The JSON contains the expected output from read_rigaku_raw().
+for regression testing. The JSON contains the expected output from read_bruker_raw().
 """
 
 import sys
@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Import parser (adjust path if needed)
 try:
-    from fairmat_readers_xrd import read_rigaku_raw
+    from fairmat_readers_xrd import read_bruker_raw
 except ImportError:
     print('Error: Cannot import fairmat_readers_xrd')
     print("Make sure you're in the correct environment and the package is installed")
@@ -48,7 +48,7 @@ def generate_reference(raw_file: Path, output_file: Path = None):
     """
     Generate reference JSON from a RAW file for regression testing.
 
-    This function creates a JSON file containing the expected output of read_rigaku_raw().
+    This function creates a JSON file containing the expected output of read_bruker_raw().
     The reference JSON is used in test_rigaku_raw.py to ensure the parser output
     remains consistent across code changes (regression testing).
 
@@ -69,7 +69,7 @@ def generate_reference(raw_file: Path, output_file: Path = None):
 
     print(f'Reading RAW file: {raw_file}')
     try:
-        data = read_rigaku_raw(str(raw_file))
+        data = read_bruker_raw(str(raw_file))
     except Exception as e:
         print(f'Error reading RAW file: {e}')
         sys.exit(1)
