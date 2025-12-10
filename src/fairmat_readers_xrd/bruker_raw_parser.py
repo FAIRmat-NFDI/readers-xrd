@@ -254,7 +254,9 @@ class BrukerRAW4Parser:
             # Read scan axis name from fixed offset (null-terminated ASCII string)
             # At offset 0x04D0 we find the axis name (e.g., "Theta")
             axis_bytes = data[0x04D0:0x04E0]
-            axis_name = axis_bytes.split(b'\x00')[0].decode('ascii', errors='ignore').strip()
+            axis_name = (
+                axis_bytes.split(b'\x00')[0].decode('ascii', errors='ignore').strip()
+            )
             if axis_name:
                 self.scan_params['scan_axis'] = axis_name
                 self.logger.info(f'Scan axis: {axis_name}')
@@ -273,22 +275,26 @@ class BrukerRAW4Parser:
                 if segment:
                     anode_material = segment.decode('ascii', errors='ignore').strip()
                     break
-            
+
             if anode_material and anode_material in XRAY_WAVELENGTHS:
                 self.metadata['anode_material'] = anode_material
                 self.logger.info(f'X-ray tube anode: {anode_material}')
-                
+
                 # Add wavelength data from lookup table
                 wavelengths = XRAY_WAVELENGTHS[anode_material]
                 self.metadata['wavelength_kalpha1'] = wavelengths['K_alpha1']
                 self.metadata['wavelength_kalpha2'] = wavelengths['K_alpha2']
                 self.metadata['wavelength_kbeta'] = wavelengths['K_beta']
                 self.metadata['wavelength_kalpha_avg'] = wavelengths['K_alpha_avg']
-                self.metadata['kalpha2_kalpha1_ratio'] = wavelengths['K_alpha2_K_alpha1_ratio']
+                self.metadata['kalpha2_kalpha1_ratio'] = wavelengths[
+                    'K_alpha2_K_alpha1_ratio'
+                ]
                 self.logger.info(f'K-alpha1: {wavelengths["K_alpha1"]} Å')
                 self.logger.info(f'K-alpha2: {wavelengths["K_alpha2"]} Å')
             elif anode_material:
-                self.logger.warning(f'Unknown anode material "{anode_material}" - wavelengths not available')
+                self.logger.warning(
+                    f'Unknown anode material "{anode_material}" - wavelengths not available'
+                )
                 self.metadata['anode_material'] = anode_material
         except Exception as e:
             self.logger.warning(f'Could not read anode material at 0x01a8: {e}')
