@@ -95,7 +95,7 @@ class BrukerRAW4Parser:
     METADATA_TAGS = {
         b'USER\x00\x00\x00\x00': 'user',
         b'SITE\x00\x00\x00\x00': 'site',
-        b'SAMPLEID': 'sample_id',
+        # b'SAMPLEID': 'sample_id',  # Disabled for consistency with other formats
         b'COMMENT\x00': 'comment',
         b'CREATOR\x00': 'creator',
     }

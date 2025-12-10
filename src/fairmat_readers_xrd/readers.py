@@ -376,7 +376,7 @@ def read_bruker_raw(
             }
 
         metadata = {
-            'sample_id': raw_data['metadata'].get('sample_id'),
+            'sample_id': None,  # Not extracted for consistency with other formats
             'scan_type': scan_type,
             'scan_axis': scan_axis,  # Extracted from RAW file at offset 0x04D0
             'source': source_metadata,  # Anode material and wavelengths from lookup table
