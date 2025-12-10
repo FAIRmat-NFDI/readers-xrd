@@ -17,6 +17,54 @@ from typing import Dict, Any, Optional, Tuple
 import logging
 
 
+# X-ray wavelength reference table (in Angstroms)
+# Source: International Tables for Crystallography, Volume C
+XRAY_WAVELENGTHS = {
+    'Cu': {
+        'K_alpha1': 1.540598,
+        'K_alpha2': 1.544426,
+        'K_beta': 1.392250,
+        'K_alpha_avg': 1.5418,  # Weighted average
+        'K_alpha2_K_alpha1_ratio': 0.5,
+    },
+    'Mo': {
+        'K_alpha1': 0.709319,
+        'K_alpha2': 0.713609,
+        'K_beta': 0.632305,
+        'K_alpha_avg': 0.71073,
+        'K_alpha2_K_alpha1_ratio': 0.5,
+    },
+    'Co': {
+        'K_alpha1': 1.788996,
+        'K_alpha2': 1.792850,
+        'K_beta': 1.620830,
+        'K_alpha_avg': 1.79026,
+        'K_alpha2_K_alpha1_ratio': 0.5,
+    },
+    'Fe': {
+        'K_alpha1': 1.936046,
+        'K_alpha2': 1.939996,
+        'K_beta': 1.757462,
+        'K_alpha_avg': 1.93736,
+        'K_alpha2_K_alpha1_ratio': 0.5,
+    },
+    'Cr': {
+        'K_alpha1': 2.289760,
+        'K_alpha2': 2.293663,
+        'K_beta': 2.084920,
+        'K_alpha_avg': 2.29100,
+        'K_alpha2_K_alpha1_ratio': 0.5,
+    },
+    'Ag': {
+        'K_alpha1': 0.559420,
+        'K_alpha2': 0.563813,
+        'K_beta': 0.497082,
+        'K_alpha_avg': 0.56087,
+        'K_alpha2_K_alpha1_ratio': 0.5,
+    },
+}
+
+
 class BrukerRAW4Parser:
     """
     Parser for Siemens/Bruker RAW v4 binary files (single-axis powder diffraction).
@@ -213,6 +261,37 @@ class BrukerRAW4Parser:
         except Exception as e:
             self.logger.error(f'Could not read scan axis at 0x04d0: {e}')
             start_angle = None
+
+        try:
+            # Read X-ray tube anode material from fixed offset (null-terminated ASCII string)
+            # At offset 0x01A8 we find the anode material (e.g., "Cu", "Mo", "Co")
+            # Note: There may be leading null bytes, so we filter them out
+            anode_bytes = data[0x01A8:0x01B0]
+            # Split on null and find first non-empty string
+            anode_material = None
+            for segment in anode_bytes.split(b'\x00'):
+                if segment:
+                    anode_material = segment.decode('ascii', errors='ignore').strip()
+                    break
+            
+            if anode_material and anode_material in XRAY_WAVELENGTHS:
+                self.metadata['anode_material'] = anode_material
+                self.logger.info(f'X-ray tube anode: {anode_material}')
+                
+                # Add wavelength data from lookup table
+                wavelengths = XRAY_WAVELENGTHS[anode_material]
+                self.metadata['wavelength_kalpha1'] = wavelengths['K_alpha1']
+                self.metadata['wavelength_kalpha2'] = wavelengths['K_alpha2']
+                self.metadata['wavelength_kbeta'] = wavelengths['K_beta']
+                self.metadata['wavelength_kalpha_avg'] = wavelengths['K_alpha_avg']
+                self.metadata['kalpha2_kalpha1_ratio'] = wavelengths['K_alpha2_K_alpha1_ratio']
+                self.logger.info(f'K-alpha1: {wavelengths["K_alpha1"]} Å')
+                self.logger.info(f'K-alpha2: {wavelengths["K_alpha2"]} Å')
+            elif anode_material:
+                self.logger.warning(f'Unknown anode material "{anode_material}" - wavelengths not available')
+                self.metadata['anode_material'] = anode_material
+        except Exception as e:
+            self.logger.warning(f'Could not read anode material at 0x01a8: {e}')
 
         # Calculate end angle if we have all required parameters
         if start_angle is not None and step_size is not None and num_points is not None:

@@ -362,11 +362,24 @@ def read_bruker_raw(
         # Extract scan axis from raw data (e.g., "Theta")
         scan_axis = raw_data['scan_params'].get('scan_axis', '')
 
+        # Build source metadata if anode material was found
+        source_metadata = {}
+        if 'anode_material' in raw_data['metadata']:
+            source_metadata = {
+                'anode_material': raw_data['metadata']['anode_material'],
+                'kAlpha1': raw_data['metadata'].get('wavelength_kalpha1'),
+                'kAlpha2': raw_data['metadata'].get('wavelength_kalpha2'),
+                'kBeta': raw_data['metadata'].get('wavelength_kbeta'),
+                'ratioKAlpha2KAlpha1': raw_data['metadata'].get(
+                    'kalpha2_kalpha1_ratio'
+                ),
+            }
+
         metadata = {
             'sample_id': raw_data['metadata'].get('sample_id'),
             'scan_type': scan_type,
             'scan_axis': scan_axis,  # Extracted from RAW file at offset 0x04D0
-            'source': {},  # RAW files don't contain source metadata
+            'source': source_metadata,  # Anode material and wavelengths from lookup table
         }
 
         # Return data in the same format as read_panalytical_xrdml
