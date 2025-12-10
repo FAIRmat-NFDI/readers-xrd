@@ -19,22 +19,32 @@ data_dict =  read_file(file_path)
 
 You can also import individual file readers.
 ```py
-from fairmat_readers_xrd import read_panalytical_xrdml
+from fairmat_readers_xrd import read_panalytical_xrdml, read_bruker_raw
 
+# Read PANalytical XRDML file
 file_path = "<filepath>.xrdml"
-data_dict =  read_panalytical_xrdml(file_path)
+data_dict = read_panalytical_xrdml(file_path)
+
+# Read Bruker/Siemens RAW v4 file
+raw_file_path = "<filepath>.raw"
+raw_data_dict = read_bruker_raw(raw_file_path)
 ```
 
 Currently, the following file extensions are supported:
 
-| File Extension    | Corresponding Reader Function     | Notes                                    |
-| ----------------- | --------------------------------- | ---------------------------------------- |
-| `.xrdml`          | `read_panalytical_xrdml`          |                                          |
-| `.rasx`           | `read_rigaku_rasx`                |                                          |
-| `.brml`           | `read_bruker_brml`                |                                          |
-| `.raw`            | `read_rigaku_raw`                 | Siemens/Bruker RAW v4, single-axis scans only |
+| File Extension    | Corresponding Reader Function     | Vendor/Format                            | Notes                                    |
+| ----------------- | --------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| `.xrdml`          | `read_panalytical_xrdml`          | PANalytical                              |                                          |
+| `.rasx`           | `read_rigaku_rasx`                | Rigaku                                   |                                          |
+| `.brml`           | `read_bruker_brml`                | Bruker                                   |                                          |
+| `.raw`            | `read_bruker_raw`                 | Bruker/Siemens RAW v4                    | Single-axis scans only, extracts anode material and wavelengths |
 
-**Note on `.raw` files**: The parser supports Siemens/Bruker RAW v4 format for single-axis theta-2theta powder diffraction scans. Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
+**Note on `.raw` files**: The parser supports **Bruker/Siemens RAW v4** format for single-axis theta-2theta powder diffraction scans. It extracts:
+- Scan parameters (angles, step size, scan axis)
+- X-ray tube anode material (from binary file offset 0x01A8)
+- Wavelengths (K-alpha1, K-alpha2, K-beta) via lookup table from International Tables for Crystallography
+
+Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
 
 ## Development
 The package is still under development. To contribute, start with simply raising an
