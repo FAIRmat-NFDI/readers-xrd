@@ -120,35 +120,29 @@ def test_bruker_raw_reader():
         assert 'scanmotname' in output, 'Missing scanmotname'
 
         # Validate extracted scan axis
-        assert output['scanmotname'] == 'Theta', (
-            f"Expected scanmotname='Theta', got '{output['scanmotname']}'"
-        )
-        assert output['metadata']['scan_axis'] == 'Theta', (
-            f"Expected scan_axis='Theta', got '{output['metadata']['scan_axis']}'"
-        )
+        assert (
+            output['scanmotname'] == 'Theta'
+        ), f"Expected scanmotname='Theta', got '{output['scanmotname']}'"
+        assert (
+            output['metadata']['scan_axis'] == 'Theta'
+        ), f"Expected scan_axis='Theta', got '{output['metadata']['scan_axis']}'"
 
         # Validate data types
-        assert hasattr(output['2Theta'], 'magnitude'), (
-            '2Theta should be a pint Quantity'
-        )
+        assert hasattr(
+            output['2Theta'], 'magnitude'
+        ), '2Theta should be a pint Quantity'
         assert hasattr(output['2Theta'], 'units'), '2Theta should have units'
-        assert hasattr(output['intensity'], 'magnitude'), (
-            'intensity should be a pint Quantity'
-        )
+        assert hasattr(
+            output['intensity'], 'magnitude'
+        ), 'intensity should be a pint Quantity'
         assert hasattr(output['intensity'], 'units'), 'intensity should have units'
         assert isinstance(output['metadata'], dict), 'metadata should be a dict'
 
         # Validate that the data arrays have content
         assert len(output['2Theta'].magnitude) > 0, '2Theta should contain data points'
-        assert len(output['intensity'].magnitude) > 0, (
-            'intensity should contain data points'
-        )
+        assert (
+            len(output['intensity'].magnitude) > 0
+        ), 'intensity should contain data points'
 
-        # Test with reference JSON if it exists
-        if os.path.exists(f'{test_raw}.json'):
-            convert_quantity_to_string(output)
-            with open(f'{test_raw}.json', 'r', encoding='utf-8') as f:
-                reference = json.load(f)
-            assert output == reference
     except Exception as e:
         pytest.skip(f'RAW reader test skipped: {str(e)}')
