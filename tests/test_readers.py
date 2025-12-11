@@ -103,10 +103,8 @@ def test_bruker_raw_reader():
     - Scan parameter completion (from paired XRDML if available)
     - Output format compatibility with other readers
     """
-    # Note: This test requires a sample .raw file to be added to tests/data/
-    # For now, we test the basic functionality without a reference JSON
-    # Check if a test RAW file exists
-    test_raw = 'tests/data/test_sample.raw'
+    # Test with scrambled RAW file (anonymized client data)
+    test_raw = 'tests/data/TwoTheta_scan_scrambled.raw'
     if not os.path.exists(test_raw):
         pytest.skip('No test RAW file available in tests/data/')
         return

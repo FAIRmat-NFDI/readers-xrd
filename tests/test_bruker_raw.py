@@ -46,11 +46,9 @@ class TestBrukerRAW4Parser:
         """
         Fixture providing path to a sample RAW file.
 
-        Note: This should be replaced with an actual test file path.
-        For CI/CD, a minimal RAW file should be added to tests/data/.
+        Uses scrambled test data (anonymized from client data).
         """
-        # This is a placeholder - replace with actual test file
-        test_file = 'tests/data/test_sample.raw'
+        test_file = 'tests/data/TwoTheta_scan_scrambled.raw'
         if not os.path.exists(test_file):
             pytest.skip(f'Test RAW file not found: {test_file}')
         return test_file
@@ -164,7 +162,7 @@ class TestReadBrukerRaw:
     @pytest.fixture
     def sample_raw_file(self):
         """Fixture providing path to a sample RAW file."""
-        test_file = 'tests/data/test_sample.raw'
+        test_file = 'tests/data/TwoTheta_scan_scrambled.raw'
         if not os.path.exists(test_file):
             pytest.skip(f'Test RAW file not found: {test_file}')
         return test_file
@@ -186,9 +184,9 @@ class TestReadBrukerRaw:
         output = read_bruker_raw(sample_raw_file)
 
         # Check 2Theta is a pint Quantity with units
-        assert hasattr(output['2Theta'], 'magnitude'), (
-            '2Theta should be a pint Quantity'
-        )
+        assert hasattr(
+            output['2Theta'], 'magnitude'
+        ), '2Theta should be a pint Quantity'
         assert hasattr(output['2Theta'], 'units'), '2Theta should have units'
         # Should be in degrees
         assert str(output['2Theta'].units) == 'degree'
@@ -196,9 +194,9 @@ class TestReadBrukerRaw:
         assert len(output['2Theta'].magnitude) > 0
 
         # Check intensity is a pint Quantity with units
-        assert hasattr(output['intensity'], 'magnitude'), (
-            'intensity should be a pint Quantity'
-        )
+        assert hasattr(
+            output['intensity'], 'magnitude'
+        ), 'intensity should be a pint Quantity'
         assert hasattr(output['intensity'], 'units'), 'intensity should have units'
         # Should be dimensionless
         assert str(output['intensity'].units) == 'dimensionless'
@@ -272,7 +270,7 @@ class TestBrukerRawIntegration:
     def test_data_array_consistency(self, sample_raw_file=None):
         """Test that data arrays have consistent lengths."""
         if sample_raw_file is None:
-            sample_raw_file = 'tests/data/test_sample.raw'
+            sample_raw_file = 'tests/data/TwoTheta_scan_scrambled.raw'
         if not os.path.exists(sample_raw_file):
             pytest.skip(f'Test RAW file not found: {sample_raw_file}')
 
@@ -281,9 +279,9 @@ class TestBrukerRawIntegration:
         # All data arrays should have same length (both are pint Quantities with arrays)
         assert len(output['2Theta'].magnitude) > 0, '2Theta should contain data'
         assert len(output['intensity'].magnitude) > 0, 'intensity should contain data'
-        assert len(output['2Theta'].magnitude) == len(output['intensity'].magnitude), (
-            '2Theta and intensity arrays should have the same length'
-        )
+        assert len(output['2Theta'].magnitude) == len(
+            output['intensity'].magnitude
+        ), '2Theta and intensity arrays should have the same length'
 
 
 # Parametric tests for different scenarios
