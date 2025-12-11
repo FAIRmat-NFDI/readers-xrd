@@ -184,9 +184,9 @@ class TestReadBrukerRaw:
         output = read_bruker_raw(sample_raw_file)
 
         # Check 2Theta is a pint Quantity with units
-        assert hasattr(
-            output['2Theta'], 'magnitude'
-        ), '2Theta should be a pint Quantity'
+        assert hasattr(output['2Theta'], 'magnitude'), (
+            '2Theta should be a pint Quantity'
+        )
         assert hasattr(output['2Theta'], 'units'), '2Theta should have units'
         # Should be in degrees
         assert str(output['2Theta'].units) == 'degree'
@@ -194,9 +194,9 @@ class TestReadBrukerRaw:
         assert len(output['2Theta'].magnitude) > 0
 
         # Check intensity is a pint Quantity with units
-        assert hasattr(
-            output['intensity'], 'magnitude'
-        ), 'intensity should be a pint Quantity'
+        assert hasattr(output['intensity'], 'magnitude'), (
+            'intensity should be a pint Quantity'
+        )
         assert hasattr(output['intensity'], 'units'), 'intensity should have units'
         # Should be dimensionless
         assert str(output['intensity'].units) == 'dimensionless'
@@ -279,9 +279,9 @@ class TestBrukerRawIntegration:
         # All data arrays should have same length (both are pint Quantities with arrays)
         assert len(output['2Theta'].magnitude) > 0, '2Theta should contain data'
         assert len(output['intensity'].magnitude) > 0, 'intensity should contain data'
-        assert len(output['2Theta'].magnitude) == len(
-            output['intensity'].magnitude
-        ), '2Theta and intensity arrays should have the same length'
+        assert len(output['2Theta'].magnitude) == len(output['intensity'].magnitude), (
+            '2Theta and intensity arrays should have the same length'
+        )
 
 
 # Parametric tests for different scenarios
