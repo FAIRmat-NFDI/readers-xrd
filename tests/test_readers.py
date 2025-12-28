@@ -93,56 +93,9 @@ def test_brml_reader():
 
 
 def test_bruker_raw_reader():
-    """
-    Test the Bruker/Siemens RAW v4 parser with a sample file.
-
-    This test validates:
-    - Binary file parsing
-    - Metadata extraction
-    - Intensity data extraction
-    - Scan parameter completion (from paired XRDML if available)
-    - Output format compatibility with other readers
-    """
-    # Test with scrambled RAW file (anonymized client data)
-    test_raw = 'tests/data/TwoTheta_scan_scrambled.raw'
-    if not os.path.exists(test_raw):
-        pytest.skip('No test RAW file available in tests/data/')
-        return
-
-    try:
-        output = read_bruker_raw(test_raw)
-
-        # Validate structure
-        assert output is not None, 'read_bruker_raw returned None'
-        assert '2Theta' in output, 'Missing 2Theta data'
-        assert 'intensity' in output, 'Missing intensity data'
-        assert 'metadata' in output, 'Missing metadata'
-        assert 'scanmotname' in output, 'Missing scanmotname'
-
-        # Validate extracted scan axis
-        assert output['scanmotname'] == 'Theta', (
-            f"Expected scanmotname='Theta', got '{output['scanmotname']}'"
-        )
-        assert output['metadata']['scan_axis'] == 'Theta', (
-            f"Expected scan_axis='Theta', got '{output['metadata']['scan_axis']}'"
-        )
-
-        # Validate data types
-        assert hasattr(output['2Theta'], 'magnitude'), (
-            '2Theta should be a pint Quantity'
-        )
-        assert hasattr(output['2Theta'], 'units'), '2Theta should have units'
-        assert hasattr(output['intensity'], 'magnitude'), (
-            'intensity should be a pint Quantity'
-        )
-        assert hasattr(output['intensity'], 'units'), 'intensity should have units'
-        assert isinstance(output['metadata'], dict), 'metadata should be a dict'
-
-        # Validate that the data arrays have content
-        assert len(output['2Theta'].magnitude) > 0, '2Theta should contain data points'
-        assert len(output['intensity'].magnitude) > 0, (
-            'intensity should contain data points'
-        )
-
-    except Exception as e:
-        pytest.skip(f'RAW reader test skipped: {str(e)}')
+    file_path = 'tests/data/TwoTheta_scan_scrambled.raw'
+    output = read_bruker_raw(file_path)
+    convert_quantity_to_string(output)
+    with open(f'{file_path}.json', 'r', encoding='utf-8') as f:
+        reference = json.load(f)
+    assert output == reference
