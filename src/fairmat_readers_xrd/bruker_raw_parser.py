@@ -96,7 +96,7 @@ class BrukerRAW4Parser:
     METADATA_TAGS = {
         b'USER\x00\x00\x00\x00': 'user',
         b'SITE\x00\x00\x00\x00': 'site',
-        # b'SAMPLEID': 'sample_id',  # Disabled for consistency with other formats
+        b'SAMPLEID\x00\x00\x00': 'sample_id',
         b'COMMENT\x00': 'comment',
         b'CREATOR\x00': 'creator',
     }
@@ -203,8 +203,8 @@ class BrukerRAW4Parser:
 
                 if value_end > value_start:
                     value = data[value_start:value_end]
-                    # Clean up value
-                    value_str = value.rstrip(b'\x00\x0a\x20').decode(
+                    # Clean up value - strip leading and trailing null bytes, newlines, and spaces
+                    value_str = value.strip(b'\x00\x0a\x20').decode(
                         'ascii', errors='ignore'
                     )
                     if value_str:

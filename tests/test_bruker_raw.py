@@ -87,6 +87,10 @@ class TestBrukerRAW4Parser:
         for field in expected_fields:
             assert field in metadata, f'Missing metadata field: {field}'
 
+        # Check that sample_id is extracted
+        assert 'sample_id' in metadata
+        assert metadata['sample_id'] == 'HeOx-1001-nsp-sps-900C-10min-01-poliert'
+
     def test_scan_parameters(self, sample_raw_file):
         """Test extraction of scan parameters."""
         parser = BrukerRAW4Parser(sample_raw_file)
@@ -184,9 +188,9 @@ class TestReadBrukerRaw:
         output = read_bruker_raw(sample_raw_file)
 
         # Check 2Theta is a pint Quantity with units
-        assert hasattr(output['2Theta'], 'magnitude'), (
-            '2Theta should be a pint Quantity'
-        )
+        assert hasattr(
+            output['2Theta'], 'magnitude'
+        ), '2Theta should be a pint Quantity'
         assert hasattr(output['2Theta'], 'units'), '2Theta should have units'
         # Should be in degrees
         assert str(output['2Theta'].units) == 'degree'
@@ -194,9 +198,9 @@ class TestReadBrukerRaw:
         assert len(output['2Theta'].magnitude) > 0
 
         # Check intensity is a pint Quantity with units
-        assert hasattr(output['intensity'], 'magnitude'), (
-            'intensity should be a pint Quantity'
-        )
+        assert hasattr(
+            output['intensity'], 'magnitude'
+        ), 'intensity should be a pint Quantity'
         assert hasattr(output['intensity'], 'units'), 'intensity should have units'
         # Should be dimensionless
         assert str(output['intensity'].units) == 'dimensionless'
@@ -213,9 +217,13 @@ class TestReadBrukerRaw:
         # Should have these keys
         assert 'scan_type' in metadata
         assert 'scan_axis' in metadata
+        assert 'sample_id' in metadata
 
         # scan_type should be 'line' for 1D scans
         assert metadata['scan_type'] in ['line', 'rsm']
+
+        # Verify sample_id is extracted correctly from the file
+        assert metadata['sample_id'] == 'HeOx-1001-nsp-sps-900C-10min-01-poliert'
 
     def test_paired_xrdml_detection(self, sample_raw_file):
         """Test detection and use of paired XRDML file."""
@@ -279,9 +287,9 @@ class TestBrukerRawIntegration:
         # All data arrays should have same length (both are pint Quantities with arrays)
         assert len(output['2Theta'].magnitude) > 0, '2Theta should contain data'
         assert len(output['intensity'].magnitude) > 0, 'intensity should contain data'
-        assert len(output['2Theta'].magnitude) == len(output['intensity'].magnitude), (
-            '2Theta and intensity arrays should have the same length'
-        )
+        assert len(output['2Theta'].magnitude) == len(
+            output['intensity'].magnitude
+        ), '2Theta and intensity arrays should have the same length'
 
 
 # Parametric tests for different scenarios
