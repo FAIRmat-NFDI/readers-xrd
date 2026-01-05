@@ -17,24 +17,37 @@ file_path = "<filepath>.xrdml"
 data_dict =  read_file(file_path)
 ```
 
-You can also import individual file readers. 
+You can also import individual file readers.
 ```py
-from fairmat_readers_xrd import read_panalytical_xrdml
+from fairmat_readers_xrd import read_panalytical_xrdml, read_bruker_raw
 
+# Read PANalytical XRDML file
 file_path = "<filepath>.xrdml"
-data_dict =  read_panalytical_xrdml(file_path)
+data_dict = read_panalytical_xrdml(file_path)
+
+# Read Bruker/Siemens RAW v4 file
+raw_file_path = "<filepath>.raw"
+raw_data_dict = read_bruker_raw(raw_file_path)
 ```
 
 Currently, the following file extensions are supported:
 
-| File Extension    | Corresponding Reader Function     |
-| ----------------- | --------------------------------- |
-| `.xrdml`          | `read_panalytical_xrdml`          |
-| `.rasx`           | `read_rigaku_rasx`                |
-| `.brml`           | `read_bruker_brml`                |
+| File Extension    | Corresponding Reader Function     | Vendor/Format                            | Notes                                    |
+| ----------------- | --------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| `.xrdml`          | `read_panalytical_xrdml`          | PANalytical                              |                                          |
+| `.rasx`           | `read_rigaku_rasx`                | Rigaku                                   |                                          |
+| `.brml`           | `read_bruker_brml`                | Bruker                                   |                                          |
+| `.raw`            | `read_bruker_raw`                 | Bruker/Siemens RAW v4                    | Single-axis scans only, extracts anode material and wavelengths |
+
+**Note on `.raw` files**: The parser supports **Bruker/Siemens RAW v4** format for single-axis theta-2theta powder diffraction scans. It extracts:
+- Scan parameters (angles, step size, scan axis)
+- X-ray tube anode material (from binary file offset 0x01A8)
+- Wavelengths (K-alpha1, K-alpha2, K-beta) via lookup table from International Tables for Crystallography
+
+Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
 
 ## Development
-The package is still under development. To contribute, start with simply raising an 
+The package is still under development. To contribute, start with simply raising an
 [issue](https://github.com/FAIRmat-NFDI/readers-xrd/issues) on the repo.
 
 ### Contributing code
@@ -47,7 +60,7 @@ python3 -m venv .pyenv
 source .pyenv/bin/activate
 ```
 
-Then install the package in editable mode (-e flag), with `dev` dependencies. 
+Then install the package in editable mode (-e flag), with `dev` dependencies.
 You can also run the `pytest` to confirm all went well.
 As a recommended practice, you can also install the pre-commit hook for linting (more on
 this [here](#ruff-pre-commit-hook)).
@@ -59,7 +72,7 @@ pre-commit install
 ```
 
 Now you can start tinkering around on a new branch (or a [fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo)).
-If you want to contribute the code back to the upstream, simply create a 
+If you want to contribute the code back to the upstream, simply create a
 [Pull Request (PR)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request),
 and we will get back to you. As a good practice, add tests for new readers and
 make sure existing tests (`pytest`) are passing before creating PR.
@@ -67,8 +80,8 @@ make sure existing tests (`pytest`) are passing before creating PR.
 ### Ruff
 We have placed GitHub actions for checking the linting. This can lead to your PR failing
 the CI tests in case your code is not correctly linted or formatted.
-Best way to avoid this is to use [Ruff](https://docs.astral.sh/ruff/tutorial/) for 
-automatic linting and formatting. 
+Best way to avoid this is to use [Ruff](https://docs.astral.sh/ruff/tutorial/) for
+automatic linting and formatting.
 This is already part of the `dev` environment and you can run Ruff before committing:
 ```sh
 ruff check --fix

@@ -17,9 +17,15 @@
 #
 import xml.etree.ElementTree as ET
 import collections
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, TYPE_CHECKING, Optional
 import numpy as np
 import pint
+import os
+import shutil
+import subprocess
+import tempfile
+import platform
+from pathlib import Path
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
@@ -27,6 +33,7 @@ from fairmat_readers_xrd.utils import (
     modify_scan_data,
 )
 from fairmat_readers_xrd.ikz import RASXfile, BRMLfile
+from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 
 if TYPE_CHECKING:
     from structlog.stdlib import (
@@ -56,6 +63,8 @@ def read_file(file_path: str) -> dict:
         return read_panalytical_xrdml(file_path)
     if file_path.endswith('.brml'):
         return read_bruker_brml(file_path)
+    if file_path.endswith('.raw'):
+        return read_bruker_raw(file_path)
     raise NotImplementedError('Unknown file type.')
 
 
@@ -299,6 +308,95 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
             },
         },
     }
+
+
+def read_bruker_raw(
+    file_path: str, logger: 'BoundLogger' = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Read Bruker/Siemens RAW v4 binary files using native Python parser.
+
+    This function parses Bruker RAW v4 (magic header "RAW4.00") binary files directly
+    without requiring external conversion tools. All scan parameters (start_angle,
+    step_size, num_points, scan_axis) are extracted directly from the binary file.
+
+    Args:
+        file_path (str): Path to the Bruker .raw file.
+        logger (BoundLogger, optional): Logger instance for warnings/errors.
+
+    Returns:
+        Dict[str, Any] | None: XRD data dictionary compatible with nomad-measurements
+                               schema, or None if parsing fails.
+
+    Note:
+        - Only RAW v4 format is currently supported
+        - Designed for single-axis theta-2theta powder diffraction scans
+        - Multi-axis scans (texture, pole figures) may not parse correctly
+        - All scan parameters are extracted from the binary file
+        - No external files (.xrdml) are required
+
+    Citation for RAW format understanding:
+        Siemens/Bruker RAW format is proprietary but reverse-engineered
+        for open science data management. Based on DIFFRAC.EVA output files.
+    """
+    try:
+        # Parse the RAW file - all parameters are extracted from the file
+        parser = BrukerRAW4Parser(file_path)
+        raw_data = parser.parse()
+
+        # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
+        # (list of arrays, like XRDML parser does)
+        scan_data = {
+            '2Theta': [np.array(parser.angles) * ureg.degree],
+            'intensity': [np.array(parser.intensities) * ureg.dimensionless],
+            'counts': None,
+            'countTime': None,
+            'beamAttenuationFactors': None,
+        }
+
+        # Detect scan type and modify data accordingly (like other readers)
+        scan_type = detect_scan_type(scan_data)
+        modified_scan_data = modify_scan_data(scan_data, scan_type)
+
+        # Build metadata dictionary
+        # Extract scan axis from raw data (e.g., "Theta")
+        scan_axis = raw_data['scan_params'].get('scan_axis', '')
+
+        # Build source metadata if anode material was found
+        source_metadata = {}
+        if 'anode_material' in raw_data['metadata']:
+            source_metadata = {
+                'anode_material': raw_data['metadata']['anode_material'],
+                'kAlpha1': raw_data['metadata'].get('wavelength_kalpha1'),
+                'kAlpha2': raw_data['metadata'].get('wavelength_kalpha2'),
+                'kBeta': raw_data['metadata'].get('wavelength_kbeta'),
+                'ratioKAlpha2KAlpha1': raw_data['metadata'].get(
+                    'kalpha2_kalpha1_ratio'
+                ),
+            }
+
+        metadata = {
+            'sample_id': raw_data['metadata'].get('sample_id'),
+            'scan_type': scan_type,
+            'scan_axis': scan_axis,  # Extracted from RAW file at offset 0x04D0
+            'source': source_metadata,  # Anode material and wavelengths from lookup table
+        }
+
+        # Return data in the same format as read_panalytical_xrdml
+        # Use scan_axis as scanmotname (e.g., "Theta")
+        return {
+            **modified_scan_data,
+            'scanmotname': scan_axis,  # Extracted from RAW file at offset 0x04D0
+            'metadata': metadata,
+        }
+
+    except Exception as e:
+        if logger:
+            logger.error(
+                f'Failed to parse Bruker/Siemens .raw file {file_path}: {str(e)}. '
+                f'The file may be corrupted or in an unsupported format.'
+            )
+        return None
 
 
 def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:

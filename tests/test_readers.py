@@ -16,7 +16,9 @@
 # limitations under the License.
 #
 import json
+import os
 import numpy as np
+import pytest
 
 import pint
 
@@ -24,6 +26,7 @@ from fairmat_readers_xrd import (
     read_panalytical_xrdml,
     read_rigaku_rasx,
     read_bruker_brml,
+    read_bruker_raw,
 )
 
 ureg = pint.get_application_registry()
@@ -87,3 +90,12 @@ def test_brml_reader():
         with open(f'{path}.json', 'r', encoding='utf-8') as f:
             reference = json.load(f)
         assert output == reference
+
+
+def test_bruker_raw_reader():
+    file_path = 'tests/data/TwoTheta_scan_scrambled.raw'
+    output = read_bruker_raw(file_path)
+    convert_quantity_to_string(output)
+    with open(f'{file_path}.json', 'r', encoding='utf-8') as f:
+        reference = json.load(f)
+    assert output == reference
