@@ -221,6 +221,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     scan_info = reader.get_scan_info()
     scan_data = reader.get_scan_data(logger)
     scan_hypix_data = reader.get_scan_hypix_data(logger)
+    detector = reader.get_detector_info()
     source = reader.get_source_info()
 
     if scan_data and not scan_hypix_data:
@@ -268,6 +269,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
                 'current': source['Current'],
                 'ratioKAlpha2KAlpha1': 0.5,
             },
+            'detector': detector,
         },
     }
 

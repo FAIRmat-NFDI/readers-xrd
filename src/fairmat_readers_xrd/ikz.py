@@ -135,6 +135,13 @@ def parse_rasx_metadata(xml):
             ]
         )
 
+        detector_info = mdata['Detector'] = dict()
+        detector_name = mdata['ImageInformation']['DETECTOR_NAMES']
+        for key in ['detector_description', 'detector_dimensions', 'detector_size',
+                    'spatial_beam_position']:
+            detector_info[key] = mdata['ImageInformation'][detector_name+key.upper()] 
+        detector_info['distance'] = to_pint_quantity(distances[-1].Value, 'mm')
+        
     return mdata
 
 
@@ -361,7 +368,30 @@ class RASXfile(object):
             return time.mktime(parsed_time)
         else:
             return parsed_time
+    def get_detector_info(self):
+        """
+        Collects the scan information from self.data if available.
 
+        Returns:
+            Dict[str, Any]: contains information about the scan
+        """
+        detector_data = self.meta[0].get('Detector', {})
+        if detector_data:
+            output = dict()
+            dimensions_pixels = [float(d) for d in detector_data['detector_dimensions'].split(' ')]
+            dimensions_mm = [to_pint_quantity(float(d),'mm') for d in detector_data['detector_size'].split(' ')]
+            pixel_sizes = [mm/px for mm,px in zip(dimensions_mm, dimensions_pixels)]
+            beam_position = [float(d) for d in detector_data['spatial_beam_position'].split(' ')]
+            output['detector_description'] = detector_data['detector_description']
+            output['distance'] = detector_data['distance']
+            output['x_pixel_size'] = pixel_sizes[0]
+            output['y_pixel_size'] = pixel_sizes[1]
+            output['beam_center_x'] = beam_position[0]
+            output['beam_center_y'] = beam_position[1]
+        else:
+            output = self.meta[0].get('HardwareConfig')['Detector']
+        return output
+    
 
 class BRMLfile(object):
     def __init__(self, path, exp_nbr=0, encoding='utf-8', verbose=True):
