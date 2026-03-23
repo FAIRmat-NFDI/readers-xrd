@@ -368,6 +368,36 @@ class RASXfile(object):
             return time.mktime(parsed_time)
         else:
             return parsed_time
+        
+    def get_optics_info(self):
+        """
+        Collects the scan information from self.data if available.
+
+        Returns:
+            Dict[str, Any]: contains information about the scan
+        """
+        axes_data = self.meta[0].get('Axes', {})
+        optics = dict()
+        if axes_data:
+            possible_keys = ['SelectionSlit', "IncidentOptics", 'ISS', 'IS', 'LLS',
+                             "ReceivingOptics1","Filter1", 'RSS', 'RS1', 'RS2',
+                             ]
+            for key in possible_keys:
+                if key in axes_data.keys():
+                    value = axes_data[key][3]
+                    if value.endswith('deg') or value.endswith('mm'):
+                        unit = 'deg' if value.endswith('deg') else 'mm'
+                        value = value.split('_')[-1].replace(unit,'')
+                        if '/' in value:
+                            terms = value.split('/')
+                            value = float(terms[0])/float(terms[1])
+                        optics[key] = to_pint_quantity(float(value), unit)
+                    else:
+                        optics[key] = value
+                else:
+                    optics[key] = None
+        return optics
+            
     def get_detector_info(self):
         """
         Collects the scan information from self.data if available.
