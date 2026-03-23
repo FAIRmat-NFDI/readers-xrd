@@ -358,6 +358,7 @@ class RASXfile(object):
                     source[wavelength],
                     source.get(wavelength + 'Unit', 'angstrom'),
                 )
+        output['ratioKAlpha2KAlpha1'] = to_pint_quantity(0.5)
 
         return output
 

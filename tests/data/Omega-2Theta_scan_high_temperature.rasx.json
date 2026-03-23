@@ -16,7 +16,20 @@
             "kBeta": "1.392246",
             "voltage": "40",
             "current": "150",
-            "ratioKAlpha2KAlpha1": null
-        }
+            "ratioKAlpha2KAlpha1": "0.5"
+        },
+        "optics": {
+            "SelectionSlit": "PB",
+            "IncidentOptics": null,
+            "ISS": "Soller_slit_open_s",
+            "IS": "1.0",
+            "LLS": "2.0",
+            "ReceivingOptics1": null,
+            "Filter1": "None",
+            "RSS": "2.5",
+            "RS1": "0.1",
+            "RS2": "0.1"
+        },
+        "detector": "HyPix3000(H)"
     }
 }
