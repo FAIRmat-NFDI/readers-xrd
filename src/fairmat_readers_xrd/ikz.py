@@ -286,7 +286,7 @@ class RASXfile(object):
         for scan in self.data:
             # get intensity and two_theta
             two_theta, intensity, _ = scan.transpose(1, 0)
-            output['intensity'].append(to_pint_quantity(intensity, None))
+            output['intensity'].append(to_pint_quantity(intensity, 'count'))
             output['2Theta'].append(
                 to_pint_quantity(
                     two_theta,

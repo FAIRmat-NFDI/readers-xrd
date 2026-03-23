@@ -188,6 +188,8 @@ def modify_scan_data(scan_data: dict, scan_type: str):
             if value is None:
                 continue
             data = np.array(value)
+            if len(data.shape)>2:
+                data = data[0]
             if key == 'intensity':
                 output[key] = data * value[0].units
                 continue

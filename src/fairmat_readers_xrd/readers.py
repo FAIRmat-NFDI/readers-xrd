@@ -263,7 +263,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
                 'kBeta': source['WavelengthKbeta'],
                 'voltage': source['Voltage'],
                 'current': source['Current'],
-                'ratioKAlpha2KAlpha1': None,
+                'ratioKAlpha2KAlpha1': 0.5,
             },
         },
     }
