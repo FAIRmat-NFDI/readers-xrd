@@ -1,0 +1,42 @@
+{
+    "intensity": "(5236, 385)",
+    "2Theta": "(1,)",
+    "Omega": "(1,)",
+    "Chi": "(1,)",
+    "Phi": "(1,)",
+    "countTime": "(1,)",
+    "metadata": {
+        "sample_id": null,
+        "scan_axis": "TwoThetaTheta",
+        "scan_type": "area_detector",
+        "source": {
+            "anode_material": "Cu",
+            "kAlpha1": "1.540593",
+            "kAlpha2": "1.544414",
+            "kBeta": "1.392246",
+            "voltage": "45",
+            "current": "200",
+            "ratioKAlpha2KAlpha1": "0.5"
+        },
+        "optics": {
+            "SelectionSlit": "PB",
+            "IncidentOptics": "IPS_adaptor",
+            "ISS": "Soller_slit_open",
+            "IS": "1.0",
+            "LLS": "0.5",
+            "ReceivingOptics1": "No_unit",
+            "Filter1": null,
+            "RSS": null,
+            "RS1": null,
+            "RS2": "Open"
+        },
+        "detector": {
+            "detector_description": "HyPix3000(V)",
+            "distance": "351.5",
+            "x_pixel_size": "0.1",
+            "y_pixel_size": "0.1",
+            "beam_center_x": "197.5",
+            "beam_center_y": "0.5"
+        }
+    }
+}

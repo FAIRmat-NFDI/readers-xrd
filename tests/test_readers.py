@@ -54,6 +54,7 @@ def test_rasx_reader():
         'tests/data/RSM_111_sdd=350.rasx',  # File with RSM data
         'tests/data/Omega-2Theta_scan_high_temperature.rasx',  # File with line scan data
         'tests/data/ZnO-ALD-training_001_1_0-000_0-000.rasx',  # File with X, Y data
+        'tests/data/LaB6_trainint_image.rasx'  #File with area_detector data
     ]
     for path in file_path:
         output = read_rigaku_rasx(path)
