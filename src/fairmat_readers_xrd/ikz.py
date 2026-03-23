@@ -415,10 +415,10 @@ class RASXfile(object):
             beam_position = [float(d) for d in detector_data['spatial_beam_position'].split(' ')]
             output['detector_description'] = detector_data['detector_description']
             output['distance'] = detector_data['distance']
-            output['x_pixel_size'] = pixel_sizes[0]
-            output['y_pixel_size'] = pixel_sizes[1]
-            output['beam_center_x'] = beam_position[0]
-            output['beam_center_y'] = beam_position[1]
+            output['x_pixel_size'] = pixel_sizes[1]
+            output['y_pixel_size'] = pixel_sizes[0]
+            output['beam_center_x'] = beam_position[1]
+            output['beam_center_y'] = beam_position[0]
         else:
             output = self.meta[0].get('HardwareConfig')['Detector']
         return output
