@@ -247,6 +247,9 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
                 count_time = (
                     np.array([scan_info['Step'] / scan_info['Speed']]) * count_time_unit
                 )
+            elif scan_info['Mode'].lower() == 'step':
+                speed_unit = ureg(scan_info['SpeedUnit'].replace('min', 'minute'))
+                count_time = scan_info['Speed'] * speed_unit
         scan_axis = scan_info.get('AxisName', None)
 
     return {
