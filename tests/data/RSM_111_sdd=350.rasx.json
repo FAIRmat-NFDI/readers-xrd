@@ -8,6 +8,7 @@
     "metadata": {
         "sample_id": null,
         "scan_axis": "TwoTheta",
+        "scan_mode": "Step",
         "scan_type": "rsm",
         "source": {
             "anode_material": "Cu",

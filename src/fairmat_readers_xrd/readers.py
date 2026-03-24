@@ -241,15 +241,16 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     scan_axis = None
 
     if scan_info:
+        scan_mode = scan_info['Mode'].capitalize()
         required_keys = ['Mode', 'SpeedUnit', 'PositionUnit', 'Step', 'Speed']
         if all(key in scan_info and scan_info[key] for key in required_keys):
-            if scan_info['Mode'].lower() == 'continuous':
+            if scan_mode == 'Continuous':
                 speed_unit = ureg(scan_info['SpeedUnit'].replace('min', 'minute'))
                 count_time_unit = ureg(scan_info['PositionUnit']) / speed_unit
                 count_time = (
                     np.array([scan_info['Step'] / scan_info['Speed']]) * count_time_unit
                 )
-            elif scan_info['Mode'].lower() == 'step':
+            elif scan_mode == 'Step':
                 speed_unit = ureg(scan_info['SpeedUnit'].replace('min', 'minute'))
                 count_time = scan_info['Speed'] * speed_unit
         scan_axis = scan_info.get('AxisName', None)
@@ -259,6 +260,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
         'countTime': count_time,
         'metadata': {
             'sample_id': None,
+            'scan_mode': scan_mode,
             'scan_axis': scan_axis,
             'scan_type': scan_type,
             'source': {

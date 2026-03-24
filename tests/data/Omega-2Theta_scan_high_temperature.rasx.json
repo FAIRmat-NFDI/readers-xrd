@@ -8,6 +8,7 @@
     "metadata": {
         "sample_id": null,
         "scan_axis": "TwoThetaOmega",
+        "scan_mode": "Continuous",
         "scan_type": "line",
         "source": {
             "anode_material": "Cu",
