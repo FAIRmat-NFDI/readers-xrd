@@ -412,14 +412,14 @@ class RASXfile(object):
             output = dict()
             dimensions_pixels = [float(d) for d in detector_data['detector_dimensions'].split(' ')]
             dimensions_mm = [to_pint_quantity(float(d),'mm') for d in detector_data['detector_size'].split(' ')]
-            pixel_sizes = [mm/px for mm,px in zip(dimensions_mm, dimensions_pixels)]
+            pixel_sizes = [to_pint_quantity(mm/px, 'mm') for mm,px in zip(dimensions_mm, dimensions_pixels)]
             beam_position = [float(d) for d in detector_data['spatial_beam_position'].split(' ')]
             output['detector_description'] = detector_data['detector_description']
             output['distance'] = detector_data['distance']
             output['x_pixel_size'] = pixel_sizes[1]
             output['y_pixel_size'] = pixel_sizes[0]
-            output['beam_center_x'] = beam_position[1]
-            output['beam_center_y'] = beam_position[0]
+            output['beam_center_x'] = to_pint_quantity(beam_position[1])
+            output['beam_center_y'] = to_pint_quantity(beam_position[0])
         else:
             output = self.meta[0].get('HardwareConfig')['Detector']
         return output
