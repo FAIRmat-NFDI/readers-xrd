@@ -10,6 +10,7 @@
     "metadata": {
         "sample_id": null,
         "scan_axis": "TwoThetaTheta",
+        "scan_mode": "Continuous",
         "scan_type": "line",
         "source": {
             "anode_material": "Cu",
@@ -18,7 +19,20 @@
             "kBeta": "1.392246",
             "voltage": "40",
             "current": "30",
-            "ratioKAlpha2KAlpha1": null
-        }
+            "ratioKAlpha2KAlpha1": "0.5"
+        },
+        "optics": {
+            "SelectionSlit": "PB",
+            "IncidentOptics": "IPS_adaptor",
+            "ISS": "5.0",
+            "IS": "0.7",
+            "LLS": "2.0",
+            "ReceivingOptics1": "PSA_open",
+            "Filter1": null,
+            "RSS": "5.0",
+            "RS1": "Open",
+            "RS2": "Open"
+        },
+        "detector": "DteX250(H)" 
     }
 }

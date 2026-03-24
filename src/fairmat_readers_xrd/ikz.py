@@ -127,7 +127,7 @@ def parse_rasx_metadata(xml):
                 print('Warning: unknown axis attribute: %s' % key)
         axes[axis.attrib['Name']] = Axis(**attrib)
 
-    if measurement.find('ImageInformation'):
+    if measurement.find('ImageInformation') is not None:
         mdata['ImageInformation'] = dict(
             [
                 (info[0].text, try_scalar(info[1].text))
@@ -135,6 +135,13 @@ def parse_rasx_metadata(xml):
             ]
         )
 
+        detector_info = mdata['Detector'] = dict()
+        detector_name = mdata['ImageInformation']['DETECTOR_NAMES']
+        for key in ['detector_description', 'detector_dimensions', 'detector_size',
+                    'spatial_beam_position']:
+            detector_info[key] = mdata['ImageInformation'][detector_name+key.upper()] 
+        detector_info['distance'] = to_pint_quantity(distances[-1].Value, 'mm')
+        
     return mdata
 
 
@@ -254,6 +261,7 @@ class RASXfile(object):
             if not isinstance(self.positions[axis], np.ndarray):
                 self.positions[axis] = np.array([self.positions[axis]])
             for ax_data_per_scan in self.positions[axis]:
+                axis = '2Theta' if axis=='TwoTheta' else axis
                 ax_data_per_scan = ax_data_per_scan.reshape(-1)
                 output[axis].append(
                     to_pint_quantity(ax_data_per_scan, self.units.get(axis, 'deg'))
@@ -286,7 +294,7 @@ class RASXfile(object):
         for scan in self.data:
             # get intensity and two_theta
             two_theta, intensity, _ = scan.transpose(1, 0)
-            output['intensity'].append(to_pint_quantity(intensity, None))
+            output['intensity'].append(to_pint_quantity(intensity, 'count'))
             output['2Theta'].append(
                 to_pint_quantity(
                     two_theta,
@@ -351,6 +359,7 @@ class RASXfile(object):
                     source[wavelength],
                     source.get(wavelength + 'Unit', 'angstrom'),
                 )
+        output['ratioKAlpha2KAlpha1'] = to_pint_quantity(0.5)
 
         return output
 
@@ -361,7 +370,61 @@ class RASXfile(object):
             return time.mktime(parsed_time)
         else:
             return parsed_time
+        
+    def get_optics_info(self):
+        """
+        Collects the scan information from self.data if available.
 
+        Returns:
+            Dict[str, Any]: contains information about the scan
+        """
+        axes_data = self.meta[0].get('Axes', {})
+        optics = dict()
+        if axes_data:
+            possible_keys = ['SelectionSlit', "IncidentOptics", 'ISS', 'IS', 'LLS',
+                             "ReceivingOptics1","Filter1", 'RSS', 'RS1', 'RS2',
+                             ]
+            for key in possible_keys:
+                if key in axes_data.keys():
+                    value = axes_data[key][3]
+                    if value.endswith('deg') or value.endswith('mm'):
+                        unit = 'deg' if value.endswith('deg') else 'mm'
+                        value = value.split('_')[-1].replace(unit,'')
+                        if '/' in value:
+                            terms = value.split('/')
+                            value = float(terms[0])/float(terms[1])
+                        optics[key] = to_pint_quantity(float(value), unit)
+                    else:
+                        value = None if value in ("None", "No_unit") else value
+                        optics[key] = value
+                else:
+                    optics[key] = None
+        return optics
+            
+    def get_detector_info(self):
+        """
+        Collects the scan information from self.data if available.
+
+        Returns:
+            Dict[str, Any]: contains information about the scan
+        """
+        detector_data = self.meta[0].get('Detector', {})
+        if detector_data:
+            output = dict()
+            dimensions_pixels = [float(d) for d in detector_data['detector_dimensions'].split(' ')]
+            dimensions_mm = [to_pint_quantity(float(d),'mm') for d in detector_data['detector_size'].split(' ')]
+            pixel_sizes = [to_pint_quantity(mm/px, 'mm') for mm,px in zip(dimensions_mm, dimensions_pixels)]
+            beam_position = [float(d) for d in detector_data['spatial_beam_position'].split(' ')]
+            output['detector_description'] = detector_data['detector_description']
+            output['distance'] = detector_data['distance']
+            output['x_pixel_size'] = pixel_sizes[1]
+            output['y_pixel_size'] = pixel_sizes[0]
+            output['beam_center_x'] = to_pint_quantity(beam_position[1])
+            output['beam_center_y'] = to_pint_quantity(beam_position[0])
+        else:
+            output = self.meta[0].get('HardwareConfig')['Detector']
+        return output
+    
 
 class BRMLfile(object):
     def __init__(self, path, exp_nbr=0, encoding='utf-8', verbose=True):

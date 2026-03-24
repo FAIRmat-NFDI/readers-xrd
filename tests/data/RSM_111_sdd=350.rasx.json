@@ -4,10 +4,11 @@
     "Omega": "(401,)",
     "Chi": "(1,)",
     "Phi": "(1,)",
-    "countTime": null,
+    "countTime": "1.2",
     "metadata": {
         "sample_id": null,
         "scan_axis": "TwoTheta",
+        "scan_mode": "Step",
         "scan_type": "rsm",
         "source": {
             "anode_material": "Cu",
@@ -16,7 +17,20 @@
             "kBeta": "1.392246",
             "voltage": "45",
             "current": "200",
-            "ratioKAlpha2KAlpha1": null
-        }
+            "ratioKAlpha2KAlpha1": "0.5"
+        },
+        "optics": {
+            "SelectionSlit": "PB",
+            "IncidentOptics": null,
+            "ISS": "Soller_slit_open_s",
+            "IS": "0.1",
+            "LLS": "2.0",
+            "ReceivingOptics1": null,
+            "Filter1": null,
+            "RSS": "0.5",
+            "RS1": null,
+            "RS2": "Open"
+        },
+        "detector": "HyPix3000(H)" 
     }
 }

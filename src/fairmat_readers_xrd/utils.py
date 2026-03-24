@@ -22,6 +22,9 @@ import pint
 
 ureg = pint.get_application_registry()
 
+def safely_strip_quantity(data: list):
+    return np.array([line.magnitude if hasattr(line, 'magnitude') else line
+                     for line in data])
 
 def to_pint_quantity(value: Any = None, unit: str = None) -> Any:
     """
@@ -89,8 +92,8 @@ def detect_scan_type(scan_data):
     for scan_intensity in scan_data['intensity'][1:]:
         if scan_intensity.shape != scan_data['intensity'][0].shape:
             return 'multiline'
-
-    intensity_data = np.array(scan_data['intensity']).squeeze()
+        
+    intensity_data = safely_strip_quantity(scan_data['intensity']).squeeze()
     if intensity_data.ndim > 2:
         raise AssertionError(
             f'Scan type not detected. `intensity.ndim` must be 1 or 2.\
@@ -110,8 +113,8 @@ def detect_scan_type(scan_data):
     # if only one var_axis
     # and dimensions of 2theta, var_axis, and intensity are consistent, it is a rsm
     if len(var_axis) == 1:
-        two_theta = np.array(scan_data['2Theta'])
-        var_axis_data = np.array(scan_data[var_axis[0]])
+        two_theta = safely_strip_quantity(scan_data['2Theta'])
+        var_axis_data = safely_strip_quantity(scan_data[var_axis[0]])
         if (
             intensity_data.shape == two_theta.shape
             and intensity_data.shape[0] == np.unique(var_axis_data).shape[0]
@@ -173,7 +176,7 @@ def modify_scan_data(scan_data: dict, scan_type: str):
         for key, value in scan_data.items():
             if value is None:
                 continue
-            data = np.array(value)
+            data = safely_strip_quantity(value)
             # if it is column vector, make it a row vector
             if data.shape[1] == 1:
                 data = data.reshape(-1)
@@ -187,7 +190,9 @@ def modify_scan_data(scan_data: dict, scan_type: str):
         for key, value in scan_data.items():
             if value is None:
                 continue
-            data = np.array(value)
+            data = safely_strip_quantity(value)
+            if len(data.shape)>2:
+                data = data[0]
             if key == 'intensity':
                 output[key] = data * value[0].units
                 continue
