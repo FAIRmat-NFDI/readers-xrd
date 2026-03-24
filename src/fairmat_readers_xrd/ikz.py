@@ -127,7 +127,7 @@ def parse_rasx_metadata(xml):
                 print('Warning: unknown axis attribute: %s' % key)
         axes[axis.attrib['Name']] = Axis(**attrib)
 
-    if measurement.find('ImageInformation'):
+    if measurement.find('ImageInformation') is not None:
         mdata['ImageInformation'] = dict(
             [
                 (info[0].text, try_scalar(info[1].text))
@@ -261,6 +261,7 @@ class RASXfile(object):
             if not isinstance(self.positions[axis], np.ndarray):
                 self.positions[axis] = np.array([self.positions[axis]])
             for ax_data_per_scan in self.positions[axis]:
+                axis = '2Theta' if axis=='TwoTheta' else axis
                 ax_data_per_scan = ax_data_per_scan.reshape(-1)
                 output[axis].append(
                     to_pint_quantity(ax_data_per_scan, self.units.get(axis, 'deg'))
