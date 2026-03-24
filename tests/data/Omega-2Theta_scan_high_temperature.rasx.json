@@ -25,7 +25,7 @@
             "IS": "1.0",
             "LLS": "2.0",
             "ReceivingOptics1": null,
-            "Filter1": "None",
+            "Filter1": null,
             "RSS": "2.5",
             "RS1": "0.1",
             "RS2": "0.1"

@@ -394,6 +394,7 @@ class RASXfile(object):
                             value = float(terms[0])/float(terms[1])
                         optics[key] = to_pint_quantity(float(value), unit)
                     else:
+                        value = None if value in ("None", "No_unit") else value
                         optics[key] = value
                 else:
                     optics[key] = None

@@ -27,7 +27,7 @@
             "IS": "0.7",
             "LLS": "2.0",
             "ReceivingOptics1": "PSA_open",
-            "Filter1": "None",
+            "Filter1": null,
             "RSS": "5.0",
             "RS1": "Open",
             "RS2": "Open"

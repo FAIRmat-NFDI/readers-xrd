@@ -24,7 +24,7 @@
             "ISS": "Soller_slit_open",
             "IS": "1.0",
             "LLS": "0.5",
-            "ReceivingOptics1": "No_unit",
+            "ReceivingOptics1": null,
             "Filter1": null,
             "RSS": null,
             "RS1": null,
