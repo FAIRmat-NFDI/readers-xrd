@@ -15,25 +15,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import xml.etree.ElementTree as ET
 import collections
-from typing import Dict, Any, TYPE_CHECKING, Optional
+import xml.etree.ElementTree as ET
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
 import numpy as np
 import pint
-import os
-import shutil
-import subprocess
-import tempfile
-import platform
-from pathlib import Path
+
+from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
+from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
     detect_scan_type,
     modify_scan_data,
 )
-from fairmat_readers_xrd.ikz import RASXfile, BRMLfile
-from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 
 if TYPE_CHECKING:
     from structlog.stdlib import (
@@ -81,7 +77,7 @@ def read_panalytical_xrdml(
     Returns:
         Dict[str, Any]: The X-ray diffraction data in a Python dictionary.
     """
-    with open(file_path, 'r', encoding='utf-8') as file:
+    with open(file_path, encoding='utf-8') as file:
         element_tree = ET.parse(file)
     root = element_tree.getroot()
     ns_version = root.tag.split('}')[0].strip('{')

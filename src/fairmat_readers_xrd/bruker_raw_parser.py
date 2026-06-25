@@ -12,11 +12,10 @@ Author: Generated for NOMAD
 License: MIT
 """
 
+import logging
 import struct
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
-import logging
-
+from typing import Any, Dict, Optional
 
 # X-ray wavelength reference table (in Angstroms)
 # Source: International Tables for Crystallography, Volume C

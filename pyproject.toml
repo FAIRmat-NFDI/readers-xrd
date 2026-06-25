@@ -51,8 +51,10 @@ indent-width = 4
 
 [tool.ruff.lint]
 select = [
-    "E", # pycodestyle
-    "W", # pycodestyle
+    "E",  # pycodestyle
+    "UP", # pyupgrade
+    "F",  # pyflakes
+    "I",  # isort
     "PL", # pylint
 ]
 ignore = [
