@@ -24,7 +24,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "xmltodict==0.13.0",
+    "xmltodict>=0.13.0",
     "numpy>=1.21.2",
     "pint>=0.17",
 ]
@@ -33,7 +33,7 @@ dev = [
     "pytest",
     "ruff",
     "pre-commit",
-    "structlog==22.3.0",
+    "structlog",
 ]
 
 [project.license]
