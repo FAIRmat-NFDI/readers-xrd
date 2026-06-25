@@ -1,4 +1,3 @@
-
 """
 Code adapted from io.py file available in Dr. Carsten Richter's codebase at
 https://github.com/carichte/IKZ/blob/master/IKZ/xray/io.py
