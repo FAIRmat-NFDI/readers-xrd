@@ -65,7 +65,9 @@ def parse_rasx_metadata(xml):
     distances = hwdict['distances'] = []
 
     ## python >= 3.7:
-    # Distance = collections.namedtuple("Distance", ("To", "From", "Unit", "Value"), defaults=4*[None])
+    # Distance = collections.namedtuple(
+    #     "Distance", ("To", "From", "Unit", "Value"), defaults=4*[None]
+    # )
     ## python < 3.7:
     Distance = collections.namedtuple('Distance', ('To', 'From', 'Unit', 'Value'))
     Distance.__new__.__defaults__ = (None,) * len(Distance._fields)
@@ -92,7 +94,10 @@ def parse_rasx_metadata(xml):
 
     ## python >= 3.7:
     # Axis = collections.namedtuple("Axis",
-    #                              ("Name", "Unit", "Offset", "Position", "Description"),
+    #                              (
+    #                                  "Name", "Unit", "Offset",
+    #                                  "Position", "Description"
+    #                              ),
     #                              defaults=5*[None])
     ## python < 3.7:
     Axis = collections.namedtuple(
@@ -260,10 +265,10 @@ class RASXfile(object):
                 continue
             if not isinstance(self.positions[axis], np.ndarray):
                 self.positions[axis] = np.array([self.positions[axis]])
-            for ax_data_per_scan in self.positions[axis]:
-                ax_data_per_scan = ax_data_per_scan.reshape(-1)
+            for axis_data_per_scan in self.positions[axis]:
+                reshaped_axis_data = axis_data_per_scan.reshape(-1)
                 output[axis].append(
-                    to_pint_quantity(ax_data_per_scan, self.units.get(axis, 'deg'))
+                    to_pint_quantity(reshaped_axis_data, self.units.get(axis, 'deg'))
                 )
 
         return output
@@ -332,7 +337,8 @@ class BRMLfile(object):
             with fh.open(datacontainer, 'r') as xml:
                 data = xmltodict.parse(xml.read(), encoding=encoding)
             rawlist = data['DataContainer']['RawDataReferenceList']['string']
-            # rawlist contains the reference to all the raw files (multiple in case of RSM)
+            # rawlist contains the reference to all raw files
+            # (multiple in case of RSM)
             if not isinstance(rawlist, list):
                 rawlist = [rawlist]
 
@@ -441,8 +447,8 @@ class BRMLfile(object):
             raise ValueError('More than one intensity counters found.')
 
         for scan_intensity in self.data[counter_key[0]]:
-            scan_intensity = scan_intensity.reshape(-1)
-            output['intensity'].append(to_pint_quantity(scan_intensity, None))
+            reshaped_intensity = scan_intensity.reshape(-1)
+            output['intensity'].append(to_pint_quantity(reshaped_intensity, None))
         # TwoTheta is list of dicts
         if 'TwoTheta' not in self.data:
             output['2Theta'] = None

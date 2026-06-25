@@ -21,6 +21,7 @@ from typing import Any
 import pint
 
 ureg = pint.get_application_registry()
+MAX_SUPPORTED_INTENSITY_DIMENSIONS = 2
 
 
 def to_pint_quantity(value: Any = None, unit: str = None) -> Any:
@@ -61,9 +62,8 @@ def are_all_identical(arr_list):
         first_arr = first_arr.magnitude
 
     for arr in arr_list[1:]:
-        if isinstance(arr, ureg.Quantity):
-            arr = arr.magnitude
-        if not np.array_equal(first_arr, arr):
+        arr_magnitude = arr.magnitude if isinstance(arr, ureg.Quantity) else arr
+        if not np.array_equal(first_arr, arr_magnitude):
             return False
     return True
 
@@ -72,8 +72,8 @@ def detect_scan_type(scan_data):
     """
     Based on the shape of data vectors, decide whether the scan_type is `line` (single
     line scan), `multiline` (multiple line scans), or `rsm` (reciprocal space mapping).
-    For a 2D scan, if the conditions for `rsm` are not met, it is considered a `multiline`
-    scan.
+    For a 2D scan, if the conditions for `rsm` are not met, it is considered
+    a `multiline` scan.
 
     Args:
         scan_data (dict): The X-ray diffraction data in a Python dictionary. Each key is
@@ -91,10 +91,10 @@ def detect_scan_type(scan_data):
             return 'multiline'
 
     intensity_data = np.array(scan_data['intensity']).squeeze()
-    if intensity_data.ndim > 2:
+    if intensity_data.ndim > MAX_SUPPORTED_INTENSITY_DIMENSIONS:
         raise AssertionError(
-            f'Scan type not detected. `intensity.ndim` must be 1 or 2.\
-                             Found: {intensity_data.ndim}'
+            'Scan type not detected. `intensity.ndim` must be 1 or 2. '
+            f'Found: {intensity_data.ndim}'
         )
 
     if not are_all_identical(scan_data['2Theta']):
@@ -128,10 +128,11 @@ def modify_scan_data(scan_data: dict, scan_type: str):
 
     If the scan type is `rsm`, data is converted into 2D arrays. Reduction of dimensions
     is performed wherever possible. Matrix of shape (1,n) is converted to a 1D array of
-    length `n`. Further, if the vector contains identical elements, it is reduced to a
-    point vector of size 1. In case the rows of the 2D array are identical, it is reduced
-    to a 1D array containing the first row. Similar to before, if the elements of this row
-    are identical, it is reduced to a point vector of size 1.
+    length `n`. Further, if the vector contains identical elements, it is
+    reduced to a point vector of size 1. In case the rows of the 2D array are
+    identical, it is reduced to a 1D array containing the first row. Similar
+    to before, if the elements of this row are identical, it is reduced to a
+    point vector of size 1.
 
     If the scan type is `multiline`, the data is converted into a list of 1D arrays.
     Currently not implemented.
