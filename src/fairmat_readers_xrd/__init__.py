@@ -3,4 +3,4 @@ try:
 except ImportError:
     __version__ = ''
 
-from .readers import *
+from .readers import *  # noqa: F403

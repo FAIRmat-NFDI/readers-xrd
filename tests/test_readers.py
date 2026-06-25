@@ -16,17 +16,15 @@
 # limitations under the License.
 #
 import json
-import os
-import numpy as np
-import pytest
 
+import numpy as np
 import pint
 
 from fairmat_readers_xrd import (
-    read_panalytical_xrdml,
-    read_rigaku_rasx,
     read_bruker_brml,
     read_bruker_raw,
+    read_panalytical_xrdml,
+    read_rigaku_rasx,
 )
 
 ureg = pint.get_application_registry()
@@ -55,13 +53,14 @@ def convert_quantity_to_string(data_dict):
 def test_rasx_reader():
     file_path = [
         'tests/data/RSM_111_sdd=350.rasx',  # File with RSM data
-        'tests/data/Omega-2Theta_scan_high_temperature.rasx',  # File with line scan data
+        'tests/data/Omega-2Theta_scan_high_temperature.rasx',
+        # File with line scan data
         'tests/data/ZnO-ALD-training_001_1_0-000_0-000.rasx',  # File with X, Y data
     ]
     for path in file_path:
         output = read_rigaku_rasx(path)
         convert_quantity_to_string(output)
-        with open(f'{path}.json', 'r', encoding='utf-8') as f:
+        with open(f'{path}.json', encoding='utf-8') as f:
             reference = json.load(f)
         assert output == reference
 
@@ -74,7 +73,7 @@ def test_xrdml_reader():
     for path in file_path:
         output = read_panalytical_xrdml(path)
         convert_quantity_to_string(output)
-        with open(f'{path}.json', 'r', encoding='utf-8') as f:
+        with open(f'{path}.json', encoding='utf-8') as f:
             reference = json.load(f)
         assert output == reference
 
@@ -87,7 +86,7 @@ def test_brml_reader():
     for path in file_path:
         output = read_bruker_brml(path)
         convert_quantity_to_string(output)
-        with open(f'{path}.json', 'r', encoding='utf-8') as f:
+        with open(f'{path}.json', encoding='utf-8') as f:
             reference = json.load(f)
         assert output == reference
 
@@ -96,6 +95,6 @@ def test_bruker_raw_reader():
     file_path = 'tests/data/TwoTheta_scan_scrambled.raw'
     output = read_bruker_raw(file_path)
     convert_quantity_to_string(output)
-    with open(f'{file_path}.json', 'r', encoding='utf-8') as f:
+    with open(f'{file_path}.json', encoding='utf-8') as f:
         reference = json.load(f)
     assert output == reference

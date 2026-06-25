@@ -27,13 +27,12 @@ Tests the native Python parser for Bruker/Siemens binary .raw files, including:
 """
 
 import os
-import pytest
-from fairmat_readers_xrd import read_panalytical_xrdml
-import numpy as np
-import pint
 
+import pint
+import pytest
+
+from fairmat_readers_xrd import read_bruker_raw, read_panalytical_xrdml
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
-from fairmat_readers_xrd import read_bruker_raw
 
 ureg = pint.get_application_registry()
 

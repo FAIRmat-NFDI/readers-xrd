@@ -1,8 +1,9 @@
 """
 Pure Python parser for Siemens/Bruker RAW v4 X-ray diffraction files.
 
-This module provides native Python parsing of the Siemens/Bruker proprietary binary
-.raw format (magic header "RAW4.00") without requiring external tools, Wine, or .NET libraries.
+This module provides native Python parsing of the Siemens/Bruker proprietary
+binary .raw format (magic header "RAW4.00") without requiring external tools,
+Wine, or .NET libraries.
 
 Based on reverse engineering of RAW v4 file structure from example files.
 Validated on Bruker DIFFRAC.EVA generated single-axis powder diffraction scans.
@@ -11,11 +12,10 @@ Author: Generated for NOMAD
 License: MIT
 """
 
+import logging
 import struct
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
-import logging
-
+from typing import Any, Dict, Optional
 
 # X-ray wavelength reference table (in Angstroms)
 # Source: International Tables for Crystallography, Volume C
@@ -72,7 +72,8 @@ class BrukerRAW4Parser:
 
     IMPORTANT SCOPE LIMITATION:
     This parser is designed for SINGLE-AXIS theta-2theta powder diffraction scans.
-    It extracts one scan axis (typically "Theta") and assumes a standard 1D scan geometry.
+    It extracts one scan axis (typically "Theta") and assumes a standard 1D
+    scan geometry.
 
     NOT SUPPORTED (without validation):
     - Multi-axis scans (texture, pole figures, reciprocal space maps)
@@ -86,7 +87,8 @@ class BrukerRAW4Parser:
     - Intensity data (appears as interleaved float32 pairs in tested files)
 
     Note: Format is proprietary and not fully documented. Offsets and structure
-    are reverse-engineered from example files and may not generalize to all RAW v4 variants.
+    are reverse-engineered from example files and may not generalize to all RAW
+    v4 variants.
     """
 
     HEADER_MAGIC = b'RAW4.00\x00'
@@ -126,7 +128,8 @@ class BrukerRAW4Parser:
             ValueError: If file format is invalid
 
         Warnings:
-            Logs warning about single-axis limitation - multi-axis scans may not be correctly parsed
+            Logs warning about single-axis limitation; multi-axis scans may not
+            be correctly parsed
         """
         # Log scope limitation warning
         self.logger.warning(
@@ -173,7 +176,8 @@ class BrukerRAW4Parser:
         remaining_data = full_data[offset:]
         self._parse_metadata_blocks(remaining_data)
 
-        # Parse measurement parameters and intensity data (needs full file data for absolute offsets)
+        # Parse measurement parameters and intensity data. This needs the full
+        # file data for absolute offsets.
         self._parse_measurement_data(full_data)
 
         return {
@@ -203,7 +207,7 @@ class BrukerRAW4Parser:
 
                 if value_end > value_start:
                     value = data[value_start:value_end]
-                    # Clean up value - strip leading and trailing null bytes, newlines, and spaces
+                    # Strip leading/trailing null bytes, newlines, and spaces.
                     value_str = value.strip(b'\x00\x0a\x20').decode(
                         'ascii', errors='ignore'
                     )
@@ -219,7 +223,8 @@ class BrukerRAW4Parser:
         - Step size: float64 at offset 0x020f
         - Start angle: float64 at offset 0x04fb
         - Data section: Starts at offset 0x051f (1311 bytes from start)
-        - Intensities: Interleaved float32 pairs [intensity, unknown, intensity, unknown, ...]
+        - Intensities: Interleaved float32 pairs
+          [intensity, unknown, intensity, unknown, ...]
         - End angle: Calculated from start_angle + (num_points - 1) * step_size
 
         Args:
@@ -266,7 +271,8 @@ class BrukerRAW4Parser:
             start_angle = None
 
         try:
-            # Read X-ray tube anode material from fixed offset (null-terminated ASCII string)
+            # Read X-ray tube anode material from fixed offset
+            # (null-terminated ASCII string).
             # At offset 0x01A8 we find the anode material (e.g., "Cu", "Mo", "Co")
             # Note: There may be leading null bytes, so we filter them out
             anode_bytes = data[0x01A8:0x01B0]
@@ -294,7 +300,8 @@ class BrukerRAW4Parser:
                 self.logger.info(f'K-alpha2: {wavelengths["K_alpha2"]} Å')
             elif anode_material:
                 self.logger.warning(
-                    f'Unknown anode material "{anode_material}" - wavelengths not available'
+                    f'Unknown anode material "{anode_material}" - '
+                    'wavelengths not available'
                 )
                 self.metadata['anode_material'] = anode_material
         except Exception as e:
@@ -332,7 +339,9 @@ class BrukerRAW4Parser:
                 self.logger.info(f'Extracted {len(self.intensities)} intensity values')
                 if self.intensities:
                     self.logger.info(
-                        f'Intensity range: {min(self.intensities):.2f} to {max(self.intensities):.2f}'
+                        'Intensity range: '
+                        f'{min(self.intensities):.2f} to '
+                        f'{max(self.intensities):.2f}'
                     )
 
         except Exception as e:

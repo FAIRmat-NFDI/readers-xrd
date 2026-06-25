@@ -19,9 +19,9 @@ import numpy as np
 import pint
 
 from fairmat_readers_xrd.utils import (
-    to_pint_quantity,
-    modify_scan_data,
     detect_scan_type,
+    modify_scan_data,
+    to_pint_quantity,
 )
 
 ureg = pint.get_application_registry()

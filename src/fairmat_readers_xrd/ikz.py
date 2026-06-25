@@ -1,19 +1,17 @@
-# -*- coding: utf-8 -*-
-
 """
 Code adapted from io.py file available in Dr. Carsten Richter's codebase at
 https://github.com/carichte/IKZ/blob/master/IKZ/xray/io.py
 
 """
 
-from __future__ import print_function
-from typing import TYPE_CHECKING
-import zipfile
-import sys
-import xml.etree.ElementTree as ET
 import collections
-import numpy as np
+import sys
 import time
+import xml.etree.ElementTree as ET
+import zipfile
+from typing import TYPE_CHECKING
+
+import numpy as np
 import xmltodict
 
 if TYPE_CHECKING:
@@ -65,7 +63,9 @@ def parse_rasx_metadata(xml):
     distances = hwdict['distances'] = []
 
     ## python >= 3.7:
-    # Distance = collections.namedtuple("Distance", ("To", "From", "Unit", "Value"), defaults=4*[None])
+    # Distance = collections.namedtuple(
+    #     "Distance", ("To", "From", "Unit", "Value"), defaults=4*[None]
+    # )
     ## python < 3.7:
     Distance = collections.namedtuple('Distance', ('To', 'From', 'Unit', 'Value'))
     Distance.__new__.__defaults__ = (None,) * len(Distance._fields)
@@ -92,7 +92,10 @@ def parse_rasx_metadata(xml):
 
     ## python >= 3.7:
     # Axis = collections.namedtuple("Axis",
-    #                              ("Name", "Unit", "Offset", "Position", "Description"),
+    #                              (
+    #                                  "Name", "Unit", "Offset",
+    #                                  "Position", "Description"
+    #                              ),
     #                              defaults=5*[None])
     ## python < 3.7:
     Axis = collections.namedtuple(
@@ -124,13 +127,13 @@ def parse_rasx_metadata(xml):
         if len(attrib) < len(axis.attrib):
             missing = set(axis.attrib).difference(set(attrib))
             for key in missing:
-                print('Warning: unknown axis attribute: %s' % key)
+                print(f'Warning: unknown axis attribute: {key}')
         axes[axis.attrib['Name']] = Axis(**attrib)
 
     return mdata
 
 
-class RASXfile(object):
+class RASXfile:
     def __init__(self, path, verbose=True):
         with zipfile.ZipFile(path) as fh:
             # get the path for Profile<num>.txt
@@ -142,7 +145,7 @@ class RASXfile(object):
                 if verbose:
                     if not i:
                         print('Loading profiles...')
-                    sys.stdout.write('\r%5i/%i' % (i + 1, numscans))
+                    sys.stdout.write(f'\r{i + 1:5d}/{numscans}')
                 profile = profiles[i]
                 metafile = profile.replace('Profile', 'MesurementConditions')
                 metafile = metafile[:-4] + '.xml'
@@ -166,7 +169,7 @@ class RASXfile(object):
                 if verbose:
                     if not i:
                         print('Loading frames...')
-                    sys.stdout.write('\r%5i/%i' % (i + 1, numimg))
+                    sys.stdout.write(f'\r{i + 1:5d}/{numimg}')
                 imgpath = images[i]
                 metafile = imgpath.replace('Image', 'MesurementConditions')
                 metafile = metafile[:-4] + '.xml'
@@ -260,10 +263,10 @@ class RASXfile(object):
                 continue
             if not isinstance(self.positions[axis], np.ndarray):
                 self.positions[axis] = np.array([self.positions[axis]])
-            for ax_data_per_scan in self.positions[axis]:
-                ax_data_per_scan = ax_data_per_scan.reshape(-1)
+            for axis_data_per_scan in self.positions[axis]:
+                reshaped_axis_data = axis_data_per_scan.reshape(-1)
                 output[axis].append(
-                    to_pint_quantity(ax_data_per_scan, self.units.get(axis, 'deg'))
+                    to_pint_quantity(reshaped_axis_data, self.units.get(axis, 'deg'))
                 )
 
         return output
@@ -322,17 +325,18 @@ class RASXfile(object):
             return parsed_time
 
 
-class BRMLfile(object):
+class BRMLfile:
     def __init__(self, path, exp_nbr=0, encoding='utf-8', verbose=True):
         self.path = path
         with zipfile.ZipFile(path, 'r') as fh:
-            experiment = 'Experiment%i' % exp_nbr
-            datacontainer = '%s/DataContainer.xml' % experiment
+            experiment = f'Experiment{exp_nbr}'
+            datacontainer = f'{experiment}/DataContainer.xml'
 
             with fh.open(datacontainer, 'r') as xml:
                 data = xmltodict.parse(xml.read(), encoding=encoding)
             rawlist = data['DataContainer']['RawDataReferenceList']['string']
-            # rawlist contains the reference to all the raw files (multiple in case of RSM)
+            # rawlist contains the reference to all raw files
+            # (multiple in case of RSM)
             if not isinstance(rawlist, list):
                 rawlist = [rawlist]
 
@@ -341,9 +345,9 @@ class BRMLfile(object):
             for i, rawpath in enumerate(rawlist):
                 if verbose:
                     if not i:
-                        print('Loading frame %i' % i, end='')
+                        print(f'Loading frame {i}', end='')
                     else:
-                        print(', %i' % i, end='')
+                        print(f', {i}', end='')
                 with fh.open(rawpath, 'r') as xml:
                     # entering RawData<int>.xml
                     data = xmltodict.parse(xml.read(), encoding=encoding)
@@ -441,8 +445,8 @@ class BRMLfile(object):
             raise ValueError('More than one intensity counters found.')
 
         for scan_intensity in self.data[counter_key[0]]:
-            scan_intensity = scan_intensity.reshape(-1)
-            output['intensity'].append(to_pint_quantity(scan_intensity, None))
+            reshaped_intensity = scan_intensity.reshape(-1)
+            output['intensity'].append(to_pint_quantity(reshaped_intensity, None))
         # TwoTheta is list of dicts
         if 'TwoTheta' not in self.data:
             output['2Theta'] = None
