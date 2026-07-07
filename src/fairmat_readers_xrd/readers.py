@@ -225,10 +225,20 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     reader = RASXfile(file_path, verbose=False)
     scan_info = reader.get_scan_info()
     scan_data = reader.get_scan_data(logger)
+    scan_hypix_data = reader.get_scan_hypix_data(logger)
     source = reader.get_source_info()
 
-    scan_type = detect_scan_type(scan_data)
-    modified_scan_data = modify_scan_data(scan_data, scan_type)
+    if scan_data and not scan_hypix_data:
+        scan_type = detect_scan_type(scan_data)
+        modified_scan_data = modify_scan_data(scan_data, scan_type)
+    elif scan_hypix_data and not scan_data:
+        scan_type = 'area_detector'
+        modified_scan_data = modify_scan_data(scan_hypix_data, scan_type)
+    else:
+        raise ValueError(
+            'Unable to determine scan type. Only one of `scan_data` or '
+            '`scan_hypix_data` should be present.'
+        )
 
     count_time = None
     scan_axis = None
