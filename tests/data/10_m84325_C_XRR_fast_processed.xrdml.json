@@ -1,21 +1,22 @@
 {
-    "2Theta": "(255,)",
-    "Omega": "(101,)",
+    "2Theta": "(399,)",
+    "Omega": "(399,)",
     "Phi": "(1,)",
     "Chi": "(1,)",
     "X": "(1,)",
     "Y": "(1,)",
     "Z": "(1,)",
-    "intensity": "(101, 255)",
-    "counts": "(101, 255)",
+    "intensity": "(399,)",
+    "counts": "(399,)",
     "countTime": "(1,)",
-    "scanmotname": "2Theta",
+    "beamAttenuationFactors": "(399,)",
+    "scanmotname": "2Theta-Omega",
     "metadata": {
-        "sample_id": null,
-        "instrument_id": "0000000011073629",
-        "start_time": "2020-08-04T19:53:22+02:00",
-        "measurement_type": "Area measurement",
+        "sample_id": "m778",
+        "measurement_type": "Scan",
         "sample_mode": "Reflection",
+        "instrument_id": "0000000000001263",
+        "start_time": "2026-06-23T16:09:43+02:00",
         "source": {
             "current": "40.0",
             "voltage": "40.0",
@@ -26,7 +27,7 @@
             "anode_material": "Cu"
         },
         "scan_mode": "Continuous",
-        "scan_axis": "2Theta",
-        "scan_type": "rsm"
+        "scan_axis": "2Theta-Omega",
+        "scan_type": "line"
     }
 }

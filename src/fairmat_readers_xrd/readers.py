@@ -183,7 +183,7 @@ def read_panalytical_xrdml(
             ),
             'start_time': find_string(
                 'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:startTimeStamp'
-            ),                        
+            ),
             'source': {
                 'current': find_float(
                     'xrdml:xrdMeasurement/xrdml:incidentBeamPath/xrdml:xRayTube'
