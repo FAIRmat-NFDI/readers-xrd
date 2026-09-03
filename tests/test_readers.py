@@ -69,6 +69,7 @@ def test_xrdml_reader():
     file_path = [
         'tests/data/XRD-918-16_10.xrdml',
         'tests/data/m82762_rc1mm_1_16dg_src_slit_phi-101_3dg_-420_mesh_long.xrdml',
+        'tests/data/10_m84325_C_XRR_fast_processed.xrdml',
     ]
     for path in file_path:
         output = read_panalytical_xrdml(path)
