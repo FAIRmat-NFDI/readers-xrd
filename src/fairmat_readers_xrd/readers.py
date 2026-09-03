@@ -177,6 +177,13 @@ def read_panalytical_xrdml(
             'sample_id': find_string('xrdml:sample/xrdml:id'),
             'measurement_type': xrd_measurement.get('measurementType', None),
             'sample_mode': xrd_measurement.get('sampleMode', None),
+            'instrument_id': find_string(
+                'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:source'
+                '/xrdml:instrumentID'
+            ),
+            'start_time': find_string(
+                'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:startTimeStamp'
+            ),                        
             'source': {
                 'current': find_float(
                     'xrdml:xrdMeasurement/xrdml:incidentBeamPath/xrdml:xRayTube'
