@@ -130,6 +130,14 @@ def parse_rasx_metadata(xml):
                 print(f'Warning: unknown axis attribute: {key}')
         axes[axis.attrib['Name']] = Axis(**attrib)
 
+    if measurement.find('ImageInformation'):
+        mdata['ImageInformation'] = dict(
+            [
+                (info[0].text, try_scalar(info[1].text))
+                for info in measurement.find('ImageInformation/DTHeader')
+            ]
+        )
+
     return mdata
 
 
@@ -177,17 +185,16 @@ class RASXfile:
 
                 with fh.open(metafile) as xml:
                     meta.append(parse_rasx_metadata(xml))
-                optics = meta[-1]['HardwareConfig']['optics']
-                if optics['Detector'] == 'HyPix3000(H)':
-                    det_shape = 385, 775
-                elif optics['Detector'] == 'HyPix3000(V)':
-                    det_shape = 775, 385
+                image_info = meta[-1]['ImageInformation']
+                det_shape_str = image_info.get('PXD_DETECTOR_DIMENSIONS')
+                if det_shape_str:
+                    det_shape = tuple(int(i) for i in det_shape_str.split())
                 else:
                     det_shape = (-1,)
                 with fh.open(imgpath) as f:
-                    imgarr = np.fromstring(f.read(), dtype=np.uint32)
-                    imgarr.resize(det_shape)
-                    imgdata.append(imgarr)
+                    imgarr = np.frombuffer(f.read(), dtype=np.uint32).copy()
+                    resized_imgarr = np.reshape(imgarr, det_shape)
+                    imgdata.append(resized_imgarr)
 
             if verbose:
                 print()
@@ -226,6 +233,37 @@ class RASXfile:
 
         return output
 
+    def get_scan_hypix_data(self, logger: 'BoundLogger' = None):
+        """
+        Collects the HyPix3000 detector data, if available.
+
+        Returns:
+            Dict[str, Any]: contains information about the HyPix data
+        """
+        if not self.images:
+            return None
+
+        output = collections.defaultdict(list)
+
+        for image in self.images:
+            # get intensity and two_theta
+            output['intensity'].append(to_pint_quantity(image, None))
+
+        for axis in ['TwoTheta', 'Omega', 'Chi', 'Phi', 'X', 'Y']:
+            # get axis positions
+            if axis not in self.positions:
+                output[axis] = None
+                continue
+            if not isinstance(self.positions[axis], np.ndarray):
+                self.positions[axis] = np.array([self.positions[axis]])
+            for ax_data_per_scan in self.positions[axis]:
+                ax_data_per_scan = ax_data_per_scan.reshape(-1)
+                output[axis].append(
+                    to_pint_quantity(ax_data_per_scan, self.units.get(axis, 'deg'))
+                )
+
+        return output
+
     def get_scan_data(self, logger: 'BoundLogger' = None):
         """
         Collect intensity, two_theta, and axis positions. If units are not available for
@@ -238,6 +276,9 @@ class RASXfile:
             Dict[str, Any]: Each element contains a list of scan data as ureg.Quantity
                 arrays.
         """
+        if not self.data:
+            return None
+
         output = collections.defaultdict(list)
 
         scan_axis = None
