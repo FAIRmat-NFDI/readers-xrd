@@ -158,6 +158,39 @@ class TestBrukerRAW4Parser:
         # Check that first angle matches start angle
         assert angles[0] == pytest.approx(parser.scan_params['start_angle'], rel=1e-6)
 
+    def test_xy_export_leaves_out_unknown_start_and_step(self, sample_raw_file):
+        """
+        The XY header must not invent a start angle or step of 0
+        (Bug B34 in https://github.com/FAIRmat-NFDI/pynxtools-plugin-audit/blob/main/pynxtools-unification/FINDINGS.md).
+        """
+        # With a real file, start and step are known and written as before.
+        parser = BrukerRAW4Parser(sample_raw_file)
+        parser.parse()
+        header = parser.to_xy_format().splitlines()
+        assert '# Start: 10.000°' in header
+        assert any(line.startswith('# Step: ') for line in header)
+
+        # Without them, the export used to write "Start: 0.000°" and
+        # "Step: 0.0000°", which looks like real data. Now the lines are left out.
+        parser.scan_params = {}
+        header = parser.to_xy_format().splitlines()
+        assert not any(line.startswith(('# Start:', '# Step:')) for line in header)
+
+    def test_missing_start_angle_does_not_crash(self, sample_raw_file, tmp_path):
+        """A file too short to hold the start angle must not crash the parser."""
+        # The start angle sits at byte 0x04FB. A file cut before it used to
+        # crash with UnboundLocalError, because start_angle = None was set in
+        # the wrong except block. Now the angle is just reported as missing.
+        with open(sample_raw_file, 'rb') as f:
+            truncated = f.read(0x04FB)
+        truncated_file = tmp_path / 'truncated.raw'
+        truncated_file.write_bytes(truncated)
+
+        parser = BrukerRAW4Parser(str(truncated_file))
+        parser.parse()
+        assert 'start_angle' not in parser.scan_params
+        assert parser.angles is None
+
 
 class TestReadBrukerRaw:
     """Test suite for read_bruker_raw() integration function."""
