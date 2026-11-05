@@ -255,7 +255,7 @@ class BrukerRAW4Parser:
             self.logger.info(f'Start angle: {start_angle}°')
         except Exception as e:
             self.logger.error(f'Could not read start angle at 0x04fb: {e}')
-
+            start_angle = None
         try:
             # Read scan axis name from fixed offset (null-terminated ASCII string)
             # At offset 0x04D0 we find the axis name (e.g., "Theta")
@@ -268,7 +268,6 @@ class BrukerRAW4Parser:
                 self.logger.info(f'Scan axis: {axis_name}')
         except Exception as e:
             self.logger.error(f'Could not read scan axis at 0x04d0: {e}')
-            start_angle = None
 
         try:
             # Read X-ray tube anode material from fixed offset
@@ -363,8 +362,10 @@ class BrukerRAW4Parser:
         lines.append(
             f'# Date: {self.metadata.get("date", "")} {self.metadata.get("time", "")}'
         )
-        lines.append(f'# Start: {self.scan_params.get("start_angle", 0):.3f}°')
-        lines.append(f'# Step: {self.scan_params.get("step_size", 0):.4f}°')
+        if 'start_angle' in self.scan_params:
+            lines.append(f'# Start: {self.scan_params["start_angle"]:.3f}°')
+        if 'step_size' in self.scan_params:
+            lines.append(f'# Step: {self.scan_params["step_size"]:.4f}°')
         lines.append(f'# Points: {len(self.intensities)}')
         lines.append('#')
         lines.append('# 2Theta(°)  Intensity(counts)')
