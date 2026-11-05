@@ -289,6 +289,19 @@ class TestReadBrukerRaw:
             assert len(output['2Theta']) > 0
             assert len(output['intensity']) > 0
 
+    def test_missing_start_angle_raises(self, sample_raw_file, tmp_path):
+        """read_bruker_raw must raise for a file without a 2Theta axis (B34)."""
+        # A file cut before the start angle cannot give a 2Theta axis. The
+        # function used to swallow the error and return None, so callers got
+        # no output and, without a logger, no message. Now it raises.
+        with open(sample_raw_file, 'rb') as f:
+            truncated = f.read(0x04FB)
+        truncated_file = tmp_path / 'truncated.raw'
+        truncated_file.write_bytes(truncated)
+
+        with pytest.raises(ValueError, match='2Theta scan cannot be built'):
+            read_bruker_raw(str(truncated_file))
+
 
 class TestBrukerRawIntegration:
     """Integration tests for RAW parser with NOMAD-measurements."""

@@ -17,7 +17,7 @@
 #
 import collections
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict
 
 import numpy as np
 import pint
@@ -313,9 +313,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     }
 
 
-def read_bruker_raw(
-    file_path: str, logger: 'BoundLogger' = None
-) -> Optional[Dict[str, Any]]:
+def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
     """
     Read Bruker/Siemens RAW v4 binary files using native Python parser.
 
@@ -328,8 +326,12 @@ def read_bruker_raw(
         logger (BoundLogger, optional): Logger instance for warnings/errors.
 
     Returns:
-        Dict[str, Any] | None: XRD data dictionary compatible with nomad-measurements
-                               schema, or None if parsing fails.
+        Dict[str, Any]: XRD data dictionary compatible with nomad-measurements
+                        schema.
+
+    Raises:
+        ValueError: If the 2Theta scan cannot be built (missing start angle,
+            step size, number of points or intensities).
 
     Note:
         - Only RAW v4 format is currently supported
@@ -346,7 +348,11 @@ def read_bruker_raw(
         # Parse the RAW file - all parameters are extracted from the file
         parser = BrukerRAW4Parser(file_path)
         raw_data = parser.parse()
-
+        if not parser.angles or not parser.intensities:
+            raise ValueError(
+                'start angle, step size, number of points or intensities '
+                'are missing, so the 2Theta scan cannot be built'
+            )
         # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
         # (list of arrays, like XRDML parser does)
         scan_data = {
@@ -400,7 +406,7 @@ def read_bruker_raw(
                 f'Failed to parse Bruker/Siemens .raw file {file_path}: {str(e)}. '
                 f'The file may be corrupted or in an unsupported format.'
             )
-        return None
+        raise
 
 
 def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
