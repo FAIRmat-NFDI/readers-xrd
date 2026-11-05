@@ -24,6 +24,7 @@ import pint
 
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
+from fairmat_readers_xrd.models import validate_output
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
@@ -64,6 +65,7 @@ def read_file(file_path: str) -> dict:
     raise NotImplementedError('Unknown file type.')
 
 
+@validate_output
 def read_panalytical_xrdml(
     file_path: str, logger: 'BoundLogger' = None
 ) -> Dict[str, Any]:
@@ -217,6 +219,7 @@ def read_panalytical_xrdml(
     }
 
 
+@validate_output
 def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
     """
     Reads .rasx files from Rigaku instruments
@@ -271,6 +274,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     }
 
 
+@validate_output
 def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
     """
     Reads .brml files from Bruker instruments
@@ -313,6 +317,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
     }
 
 
+@validate_output
 def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
     """
     Read Bruker/Siemens RAW v4 binary files using native Python parser.

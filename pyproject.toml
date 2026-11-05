@@ -27,6 +27,7 @@ dependencies = [
     "xmltodict>=0.13.0",
     "numpy>=1.21.2",
     "pint>=0.17",
+    "pydantic>=2.0",
 ]
 [project.optional-dependencies]
 dev = [
