@@ -28,6 +28,7 @@
         },
         "scan_mode": "Continuous",
         "scan_axis": "2Theta-Omega",
-        "scan_type": "line"
+        "scan_type": "line",
+        "end_time": "2026-06-23T16:12:35+02:00"
     }
 }

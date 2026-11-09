@@ -375,11 +375,13 @@ class BRMLfile:
                         self.data[vname].append(rawdata[vstart : (vstart + vlen)])
 
                 self.data['ScanName'].append(scaninfo['@ScanName'])
-                self.data['TimePerStep'].append(scaninfo['TimePerStep'])
+                self.data['TimePerStep'].append(scaninfo.get('TimePerStep'))
                 self.data['TimePerStepEffective'].append(
-                    scaninfo['TimePerStepEffective']
+                    scaninfo.get('TimePerStepEffective')
                 )
-                self.data['ScanMode'].append(scaninfo['ScanMode'])
+                self.data['ScanMode'].append(scaninfo.get('ScanMode'))
+                self.data['start_time'].append(data['RawData'].get('TimeStampStarted'))
+                self.data['end_time'].append(data['RawData'].get('TimeStampFinished'))
 
                 scanaxes = scaninfo['ScanAxes']['ScanAxisInfo']
                 if not isinstance(scanaxes, list):
@@ -491,9 +493,11 @@ class BRMLfile:
             Dict[str, Any]: contains information about the scan
         """
         output = collections.defaultdict(list)
-        for key in ['ScanName']:
+        for key in ['ScanName', 'ScanMode', 'start_time']:
             if self.data.get(key) is not None:
                 output[key] = self.data.get(key)[0]
+        if self.data.get('end_time'):
+            output['end_time'] = self.data['end_time'][-1]
 
         return output
 

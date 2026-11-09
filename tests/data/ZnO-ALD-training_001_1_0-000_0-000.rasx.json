@@ -19,6 +19,9 @@
             "voltage": "40",
             "current": "30",
             "ratioKAlpha2KAlpha1": null
-        }
+        },
+        "scan_mode": "CONTINUOUS",
+        "start_time": "2024-02-19T09:05:47Z",
+        "end_time": "2024-02-19T09:15:23Z"
     }
 }

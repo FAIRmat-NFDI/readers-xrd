@@ -46,6 +46,33 @@ Currently, the following file extensions are supported:
 
 Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
 
+## Nominal counting times
+
+`countTime` contains nominal integration/counting times in seconds per measurement
+step or detector acquisition. Common values remain one-element vectors; varying
+scan times retain scan order. Do not multiply them by the number of detector
+channels or interpret them as total duration or measured detector live time.
+
+| Format | Time source |
+| --- | --- |
+| XRDML | `commonCountingTime` |
+| RASX STEP | `Speed` when `SpeedUnit` is a time unit |
+| RASX CONTINUOUS | Absolute `Step / Speed`, with compatible units |
+| BRML | `TimePerStepEffective`, interpreted in seconds |
+| RAW | Absent when no suitable time is available |
+
+Missing, nonpositive, nonfinite, or incompatible optional times are omitted.
+If timing is incomplete across scans, omit the time array rather than assigning
+another scan's time. This metadata does not change intensity normalization.
+The Rigaku mode distinction follows the
+[General Measurement manual, page 3](https://alexzevalkink.wordpress.com/wp-content/uploads/2017/04/meas_khp2_00068_eng.pdf#page=7).
+The BRML choice follows the use of effective time in
+[GSAS-II's BRML reader](https://gsas-ii.readthedocs.io/en/latest/_modules/GSASII/imports/G2pwd_BrukerBRML.html).
+
+For XRDML, RASX, and BRML, metadata includes the first scan's start timestamp and
+the last scan's end timestamp, when present. Their supplied timezone information
+is retained. No duration or total counting time is calculated.
+
 ## Development
 The package is still under development. To contribute, start with simply raising an
 [issue](https://github.com/FAIRmat-NFDI/readers-xrd/issues) on the repo.

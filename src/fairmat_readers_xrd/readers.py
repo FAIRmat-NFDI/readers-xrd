@@ -25,6 +25,11 @@ import pint
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
 from fairmat_readers_xrd.models import validate_output
+from fairmat_readers_xrd.timing import (
+    complete_scan_times,
+    counting_time,
+    rasx_counting_time,
+)
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
@@ -112,11 +117,13 @@ def read_panalytical_xrdml(
     for scan in scans:
         data_points = scan.find('xrdml:dataPoints', ns)
         intensities = data_points.find('xrdml:intensities', ns)
-        counting_time = data_points.find('xrdml:commonCountingTime', ns)
+        time_element = data_points.find('xrdml:commonCountingTime', ns)
         attenuation = data_points.find('xrdml:beamAttenuationFactors', ns)
 
         counting_time_value.append(
-            np.fromstring(counting_time.text, sep=' ') * ureg(counting_time.get('unit'))
+            counting_time(time_element.text, time_element.get('unit'), logger)
+            if time_element is not None
+            else None
         )
         if attenuation is not None:
             attenuation_values.append(
@@ -166,7 +173,7 @@ def read_panalytical_xrdml(
     scan_data.update(axes)
     scan_data['intensity'] = intensities_array
     scan_data['counts'] = counts_array
-    scan_data['countTime'] = counting_time_value
+    scan_data['countTime'] = complete_scan_times(counting_time_value, logger)
     scan_data['beamAttenuationFactors'] = attenuation_values
 
     scan_type = detect_scan_type(scan_data)
@@ -174,6 +181,7 @@ def read_panalytical_xrdml(
 
     return {
         **modified_scan_data,
+        'countTime': modified_scan_data.get('countTime'),
         'scanmotname': scan.get('scanAxis', None),
         'metadata': {
             'sample_id': find_string('xrdml:sample/xrdml:id'),
@@ -183,8 +191,11 @@ def read_panalytical_xrdml(
                 'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:source'
                 '/xrdml:instrumentID'
             ),
-            'start_time': find_string(
-                'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:startTimeStamp'
+            'start_time': scans[0].findtext(
+                'xrdml:header/xrdml:startTimeStamp', namespaces=ns
+            ),
+            'end_time': scans[-1].findtext(
+                'xrdml:header/xrdml:endTimeStamp', namespaces=ns
             ),
             'source': {
                 'current': find_float(
@@ -237,30 +248,26 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
     scan_data = reader.get_scan_data(logger)
     source = reader.get_source_info()
 
+    scan_infos = [
+        meta.get('ScanInformation', {}) for meta in reader.meta[: len(reader.data)]
+    ]
+    scan_data['countTime'] = complete_scan_times(
+        [rasx_counting_time(info, logger) for info in scan_infos], logger
+    )
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
-
-    count_time = None
-    scan_axis = None
-
-    if scan_info:
-        required_keys = ['Mode', 'SpeedUnit', 'PositionUnit', 'Step', 'Speed']
-        if all(key in scan_info and scan_info[key] for key in required_keys):
-            if scan_info['Mode'].lower() == 'continuous':
-                speed_unit = ureg(scan_info['SpeedUnit'].replace('min', 'minute'))
-                count_time_unit = ureg(scan_info['PositionUnit']) / speed_unit
-                count_time = (
-                    np.array([scan_info['Step'] / scan_info['Speed']]) * count_time_unit
-                )
-        scan_axis = scan_info.get('AxisName', None)
+    scan_axis = scan_info.get('AxisName')
 
     return {
         **modified_scan_data,
-        'countTime': count_time,
+        'countTime': modified_scan_data.get('countTime'),
         'metadata': {
             'sample_id': None,
             'scan_axis': scan_axis,
             'scan_type': scan_type,
+            'scan_mode': scan_info.get('Mode'),
+            'start_time': scan_infos[0].get('StartTime') if scan_infos else None,
+            'end_time': scan_infos[-1].get('EndTime') if scan_infos else None,
             'source': {
                 'anode_material': source['TargetName'],
                 'kAlpha1': source['WavelengthKalpha1'],
@@ -291,6 +298,13 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
     scan_info = reader.get_scan_info()
     source = reader.get_source_info()
     scan_data = reader.get_scan_data(logger)
+    scan_data['countTime'] = complete_scan_times(
+        [
+            counting_time(value, 's', logger)
+            for value in reader.data['TimePerStepEffective']
+        ],
+        logger,
+    )
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
     modified_scan_data['Omega'] = modified_scan_data.pop(
@@ -299,11 +313,14 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
 
     return {
         **modified_scan_data,
-        'countTime': None,
+        'countTime': modified_scan_data.get('countTime'),
         'metadata': {
             'sample_id': None,
             'scan_axis': scan_info.get('ScanName', None),
             'scan_type': scan_type,
+            'scan_mode': scan_info.get('ScanMode'),
+            'start_time': scan_info.get('start_time'),
+            'end_time': scan_info.get('end_time'),
             'source': {
                 'anode_material': source['TubeMaterial'],
                 'kAlpha1': source['WaveLengthAlpha1'],
