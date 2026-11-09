@@ -46,6 +46,13 @@ Currently, the following file extensions are supported:
 
 Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
 
+Kα1/Kα2 lookup values are shared with NOMAD Measurements through
+`fairmat_readers_xrd.wavelengths.K_ALPHA_WAVELENGTHS`, in angstroms. They retain
+the published precision of [International Tables for Crystallography (2006),
+Vol. C, Table 4.2.2.1](https://onlinelibrary.wiley.com/iucr/itc/Cb/ch4o2v0001/sec4o2o2/).
+The RAW Kα mean uses the existing 2:1 intensity ratio. Reported wavelengths in
+other file formats are preserved rather than replaced by reference values.
+
 ## Nominal counting times
 
 `countTime` contains nominal integration/counting times in seconds per measurement

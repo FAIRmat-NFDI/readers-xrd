@@ -17,52 +17,28 @@ import struct
 from pathlib import Path
 from typing import Any
 
-# X-ray wavelength reference table (in Angstroms)
-# Source: International Tables for Crystallography, Volume C
-# Reference: https://onlinelibrary.wiley.com/iucr/itc/Cb/ch4o2v0001/sec4o2o2/
+from fairmat_readers_xrd.wavelengths import K_ALPHA_WAVELENGTHS
+
+# Kα references are shared with NM; retain the existing Kβ values and 2:1 ratio.
 XRAY_WAVELENGTHS = {
-    'Cu': {
-        'K_alpha1': 1.540598,
-        'K_alpha2': 1.544426,
-        'K_beta': 1.392250,
-        'K_alpha_avg': 1.541874,  # Weighted average
+    material: {
+        'K_alpha1': K_ALPHA_WAVELENGTHS[material][0],
+        'K_alpha2': K_ALPHA_WAVELENGTHS[material][1],
+        'K_beta': k_beta,
+        'K_alpha_avg': (
+            2 * K_ALPHA_WAVELENGTHS[material][0] + K_ALPHA_WAVELENGTHS[material][1]
+        )
+        / 3,
         'K_alpha2_K_alpha1_ratio': 0.5,
-    },
-    'Mo': {
-        'K_alpha1': 0.709319,
-        'K_alpha2': 0.713609,
-        'K_beta': 0.632305,
-        'K_alpha_avg': 0.711464,
-        'K_alpha2_K_alpha1_ratio': 0.5,
-    },
-    'Co': {
-        'K_alpha1': 1.788996,
-        'K_alpha2': 1.792850,
-        'K_beta': 1.620830,
-        'K_alpha_avg': 1.790260,
-        'K_alpha2_K_alpha1_ratio': 0.5,
-    },
-    'Fe': {
-        'K_alpha1': 1.936046,
-        'K_alpha2': 1.939980,
-        'K_beta': 1.757462,
-        'K_alpha_avg': 1.938013,
-        'K_alpha2_K_alpha1_ratio': 0.5,
-    },
-    'Cr': {
-        'K_alpha1': 2.289760,
-        'K_alpha2': 2.293663,
-        'K_beta': 2.084920,
-        'K_alpha_avg': 2.291712,
-        'K_alpha2_K_alpha1_ratio': 0.5,
-    },
-    'Ag': {
-        'K_alpha1': 0.559420,
-        'K_alpha2': 0.563813,
-        'K_beta': 0.497082,
-        'K_alpha_avg': 0.561617,
-        'K_alpha2_K_alpha1_ratio': 0.5,
-    },
+    }
+    for material, k_beta in {
+        'Cu': 1.392250,
+        'Mo': 0.632305,
+        'Co': 1.620830,
+        'Fe': 1.757462,
+        'Cr': 2.084920,
+        'Ag': 0.497082,
+    }.items()
 }
 
 
