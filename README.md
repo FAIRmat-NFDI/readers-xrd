@@ -37,21 +37,52 @@ Currently, the following file extensions are supported:
 | `.xrdml`          | `read_panalytical_xrdml`          | PANalytical                              |                                          |
 | `.rasx`           | `read_rigaku_rasx`                | Rigaku                                   |                                          |
 | `.brml`           | `read_bruker_brml`                | Bruker                                   |                                          |
-| `.raw`            | `read_bruker_raw`                 | Bruker/Siemens RAW v4                    | Single-axis scans only, extracts anode material and wavelengths |
+| `.raw`            | `read_bruker_raw`                 | Bruker/Siemens RAW v4                    | One Locked Coupled range; native wavelengths and times |
 
-**Note on `.raw` files**: The parser supports **Bruker/Siemens RAW v4** format for single-axis theta-2theta powder diffraction scans. It extracts:
-- Scan parameters (angles, step size, scan axis)
-- X-ray tube anode material (from binary file offset 0x01A8)
-- Wavelengths (K-alpha1, K-alpha2, K-beta) via lookup table from International Tables for Crystallography
-
-Multi-axis scans (texture, pole figures) are not validated and may not parse correctly.
+**RAW4 scope:** one `Locked Coupled` powder range. Other scan modes, multiple
+ranges, and older RAW versions are rejected with an explanation. The reader
+uses declared block lengths, point counts, and intensity-record strides rather
+than absolute positions from one reference file. It reports the detector axis
+as `2Theta`, reads native source wavelengths and tube settings, and converts
+range step time from milliseconds to seconds. Zero wavelengths remain unreported;
+a zero Kα2/Kα1 intensity ratio remains valid. No timezone is invented from the
+RAW date/time strings. The block layout follows the primary
+[GSAS-II RAW reader](https://gsas-ii.readthedocs.io/en/latest/_modules/GSASII/imports/G2pwd_BrukerRAW.html).
 
 Kα1/Kα2 lookup values are shared with NOMAD Measurements through
 `fairmat_readers_xrd.wavelengths.K_ALPHA_WAVELENGTHS`, in angstroms. They retain
 the published precision of [International Tables for Crystallography (2006),
 Vol. C, Table 4.2.2.1](https://onlinelibrary.wiley.com/iucr/itc/Cb/ch4o2v0001/sec4o2o2/).
-The RAW Kα mean uses the existing 2:1 intensity ratio. Reported wavelengths in
-other file formats are preserved rather than replaced by reference values.
+These references supply fallback estimates; valid wavelengths and ratios read
+from RAW4 or other formats take priority. A reported monochromated spectrum is
+not replaced by a tabulated Kα doublet.
+
+## Measurement arrays
+
+Intensity and original counts retain every point and scan, including constant
+spectra, identical rows, and repeated outer scan positions. Only shared axes and
+optional metadata are compacted. Equivalent axis units are converted before
+comparison and stacking; a single detector channel retains the RSM scan dimension.
+
+XRDML may mix counts and already corrected intensities across scans. Corrected
+intensity remains available in scan order; incomplete counts or attenuation-factor
+arrays are omitted rather than filled with invented values. The original file
+retains those partial metadata values. Partially missing geometric coordinates
+are rejected before classification; they cannot become shared angles. Completely
+absent optional axes remain optional.
+
+RASX profile coordinates follow `ScanInformation.AxisName`. A pure Omega profile
+produces `Omega`, while recorded fixed 2θ remains separate. `TwoTheta`,
+`TwoThetaOmega`, and `TwoThetaTheta` use a 2θ abscissa. Coordinates and units are
+read per profile before common values are compacted. No axis offsets are applied.
+The Omega mapping is covered by a synthetic file; an independent real Omega
+reference and confirmation of the Rigaku correction convention remain missing.
+
+For BRML point scans, recorded `ScanAxes` coordinates take priority over a
+reconstructed start/stop raster. Scanned Theta/Omega, Chi and Phi take priority
+over fixed motor positions. Detector-channel coordinates without recorded point
+positions still use the existing reconstruction; their channel-spacing convention
+has not been independently established.
 
 ## Nominal counting times
 
@@ -66,7 +97,7 @@ channels or interpret them as total duration or measured detector live time.
 | RASX STEP | `Speed` when `SpeedUnit` is a time unit |
 | RASX CONTINUOUS | Absolute `Step / Speed`, with compatible units |
 | BRML | `TimePerStepEffective`, interpreted in seconds |
-| RAW | Absent when no suitable time is available |
+| RAW4 | Range-header step time, converted from milliseconds |
 
 Missing, nonpositive, nonfinite, or incompatible optional times are omitted.
 If timing is incomplete across scans, omit the time array rather than assigning

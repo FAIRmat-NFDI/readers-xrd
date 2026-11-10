@@ -17,6 +17,8 @@ import struct
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from fairmat_readers_xrd.wavelengths import K_ALPHA_WAVELENGTHS
 
 # Kα references are shared with NM; retain the existing Kβ values and 2:1 ratio.
@@ -42,50 +44,38 @@ XRAY_WAVELENGTHS = {
 }
 
 
+# RAW4 block identifiers and fixed header sizes (bytes).
+_BLOCK_HEADER = 8
+_PREAMBLE = 61
+_TEXT_BLOCK = 10
+_TEXT_HEADER = 36
+_SOURCE_BLOCK = 30
+_SOURCE_HEADER = 120
+_DRIVE_BLOCK = 50
+_DRIVE_HEADER = 64
+_INTENSITY_BYTES = 4
+
+
 class BrukerRAW4Parser:
-    """
-    Parser for Siemens/Bruker RAW v4 binary files (single-axis powder diffraction).
+    """Read a single RAW4 powder range using its declared block and record sizes.
 
-    IMPORTANT SCOPE LIMITATION:
-    This parser is designed for SINGLE-AXIS theta-2theta powder diffraction scans.
-    It extracts one scan axis (typically "Theta") and assumes a standard 1D
-    scan geometry.
-
-    NOT SUPPORTED (without validation):
-    - Multi-axis scans (texture, pole figures, reciprocal space maps)
-    - Non-standard scan geometries
-    - Extraction of additional goniometer angles (omega, chi, phi) if present
-
-    File Structure (RAW v4):
-    - Header: 8 bytes ("RAW4.00\x00")
-    - Metadata blocks with tags (USER, SITE, SAMPLEID, COMMENT, CREATOR)
-    - Measurement parameters (start angle, step, count, scan axis name, etc.)
-    - Intensity data (appears as interleaved float32 pairs in tested files)
-
-    Note: Format is proprietary and not fully documented. Offsets and structure
-    are reverse-engineered from example files and may not generalize to all RAW
-    v4 variants.
+    The range/drive layout follows GSAS-II's G2pwd_BrukerRAW reader. Only the
+    locally validated Locked Coupled geometry is accepted; other modes need
+    independent reference files before their axis semantics can be supported.
     """
 
     HEADER_MAGIC = b'RAW4.00\x00'
     HEADER_SIZE = 8
-
-    # Known metadata block tags
     METADATA_TAGS = {
-        b'USER\x00\x00\x00\x00': 'user',
-        b'SITE\x00\x00\x00\x00': 'site',
-        b'SAMPLEID\x00\x00\x00': 'sample_id',
-        b'COMMENT\x00': 'comment',
-        b'CREATOR\x00': 'creator',
+        'USER': 'user',
+        'SITE': 'site',
+        'SAMPLEID': 'sample_id',
+        'COMMENT': 'comment',
+        'CREATOR': 'creator',
+        'CREATOR_VERSION': 'creator_version',
     }
 
     def __init__(self, filepath: str):
-        """
-        Initialize parser with RAW file path.
-
-        Args:
-            filepath: Path to .raw file
-        """
         self.filepath = Path(filepath)
         self.metadata = {}
         self.scan_params = {}
@@ -93,235 +83,130 @@ class BrukerRAW4Parser:
         self.angles = None
         self.logger = logging.getLogger(__name__)
 
-    def parse(self) -> dict[str, Any]:
-        """
-        Parse the RAW file and extract all data.
+    @staticmethod
+    def _text(data):
+        return data.split(b'\x00', 1)[0].decode('latin-1').strip()
 
-        Returns:
-            Dictionary containing metadata, scan parameters, and intensity data
+    @staticmethod
+    def _block(data, offset, end):
+        if offset + _BLOCK_HEADER > end:
+            raise ValueError('Truncated RAW4 block header.')
+        kind, size = struct.unpack_from('<II', data, offset)
+        if size < _BLOCK_HEADER or offset + size > end:
+            raise ValueError('Invalid RAW4 block length.')
+        return kind, size
 
-        Raises:
-            ValueError: If file format is invalid
-
-        Warnings:
-            Logs warning about single-axis limitation; multi-axis scans may not
-            be correctly parsed
-        """
-        # Log scope limitation warning
-        self.logger.warning(
-            'RAW v4 parser designed for single-axis theta-2theta scans. '
-            'Multi-axis scans (texture, pole figures) may not be correctly parsed. '
-            'Additional goniometer angles (omega, chi, phi) are not extracted.'
+    def parse(self) -> Dict[str, Any]:
+        data = self.filepath.read_bytes()
+        if not data.startswith(self.HEADER_MAGIC) or len(data) < _PREAMBLE:
+            raise ValueError('Invalid or truncated RAW4 header.')
+        # RAW4 timestamps carry no timezone; retain them without inventing one.
+        self.metadata['date'] = self._text(data[12:24])
+        self.metadata['time'] = self._text(data[24:34])
+        offset = _PREAMBLE
+        while offset + 4 <= len(data):
+            kind = struct.unpack_from('<I', data, offset)[0]
+            if kind in (0, 160):
+                self._read_range(data, offset)
+                break
+            kind, size = self._block(data, offset, len(data))
+            block = data[offset : offset + size]
+            if kind == _TEXT_BLOCK and size >= _TEXT_HEADER:
+                key = self.METADATA_TAGS.get(self._text(block[12:36]))
+                if key:
+                    self.metadata[key] = self._text(block[36:])
+            elif kind == _SOURCE_BLOCK and size >= _SOURCE_HEADER:
+                self._read_source(block)
+            offset += size
+        else:
+            raise ValueError('RAW4 measurement range is missing.')
+        return dict(
+            metadata=self.metadata,
+            scan_params=self.scan_params,
+            intensities=self.intensities,
+            angles=self.angles,
         )
 
-        with open(self.filepath, 'rb') as f:
-            # Read entire file
-            full_data = f.read()
+    def _read_source(self, block):
+        names = (
+            'wavelength_kalpha_avg',
+            'wavelength_kalpha1',
+            'wavelength_kalpha2',
+            'wavelength_kbeta',
+            'kalpha2_kalpha1_ratio',
+        )
+        material = self._text(block[116:120])
+        self.metadata['anode_material'] = material or None
+        fallback = XRAY_WAVELENGTHS.get(material, {})
+        fallback_names = (
+            'K_alpha_avg',
+            'K_alpha1',
+            'K_alpha2',
+            'K_beta',
+            'K_alpha2_K_alpha1_ratio',
+        )
+        for key, original_value, fallback_key in zip(
+            names, struct.unpack_from('<5d', block, 72), fallback_names
+        ):
+            value = original_value
+            # Zero wavelengths are unreported; a zero intensity ratio is valid.
+            if not np.isfinite(value) or value < 0:
+                self.logger.warning(f'Ignoring invalid RAW4 source value {key}.')
+                value = fallback.get(fallback_key)
+            elif value == 0 and key != 'kalpha2_kalpha1_ratio':
+                value = None
+            self.metadata[key] = value
 
-        # Verify header
-        header = full_data[: self.HEADER_SIZE]
-        if header != self.HEADER_MAGIC:
+    def _read_range(self, data, offset):
+        if offset + 160 > len(data):
+            raise ValueError('Truncated RAW4 range header.')
+        mode = self._text(data[offset + 32 : offset + 56])
+        if mode != 'Locked Coupled':
+            raise ValueError(f'Unsupported RAW4 scan mode: {mode!r}.')
+        start, step = struct.unpack_from('<2d', data, offset + 72)
+        count = struct.unpack_from('<I', data, offset + 88)[0]
+        time_ms = struct.unpack_from('<f', data, offset + 92)[0]
+        voltage, current = struct.unpack_from('<2f', data, offset + 100)
+        record_size, drive_size = struct.unpack_from('<2I', data, offset + 136)
+        if not count or not np.isfinite(start) or not np.isfinite(step) or step == 0:
+            raise ValueError('Invalid RAW4 scan coordinates or point count.')
+        if record_size < _INTENSITY_BYTES:
+            raise ValueError('RAW4 records cannot contain an intensity value.')
+        position = offset + 160
+        end = position + drive_size
+        if end > len(data):
+            raise ValueError('Truncated RAW4 drive records.')
+        drives = {}
+        while position < end:
+            kind, size = self._block(data, position, end)
+            if kind == _DRIVE_BLOCK and size >= _DRIVE_HEADER:
+                name = self._text(data[position + 12 : position + 36])
+                drives[name] = struct.unpack_from('<d', data, position + 56)[0]
+            position += size
+        if '2Theta' in drives and not np.isclose(
+            drives['2Theta'], start, atol=1e-6, rtol=0
+        ):
+            raise ValueError('RAW4 2Theta drive contradicts the range start.')
+        data_end = end + count * record_size
+        if data_end != len(data):
             raise ValueError(
-                f'Invalid RAW file header. Expected {self.HEADER_MAGIC!r}, '
-                f'got {header!r}'
+                'RAW4 data length does not match one complete range; '
+                'multiple ranges are not supported.'
             )
-
-        # Read file info (next 20 bytes after header)
-        # Contains: unknown flag (4), date (8), time (8)
-        offset = self.HEADER_SIZE
-        _ = struct.unpack('<I', full_data[offset : offset + 4])[
-            0
-        ]  # unknown_flag (unused)
-        offset += 4
-
-        # Date string (null-terminated)
-        date_bytes = full_data[offset : offset + 8]
-        self.metadata['date'] = date_bytes.rstrip(b'\x00').decode(
-            'ascii', errors='ignore'
+        self.intensities = np.ndarray(
+            (count,), dtype='<f4', buffer=data, offset=end, strides=(record_size,)
+        ).tolist()
+        self.angles = (start + np.arange(count) * step).tolist()
+        self.scan_params.update(
+            scan_axis='2Theta',
+            scan_mode=mode,
+            start_angle=start,
+            step_size=step,
+            num_points=count,
+            end_angle=self.angles[-1],
+            counting_time_ms=time_ms,
         )
-        offset += 8
-
-        # Time string (null-terminated)
-        time_bytes = full_data[offset : offset + 8]
-        self.metadata['time'] = time_bytes.rstrip(b'\x00').decode(
-            'ascii', errors='ignore'
-        )
-        offset += 8
-
-        # Parse metadata blocks (using data after header)
-        remaining_data = full_data[offset:]
-        self._parse_metadata_blocks(remaining_data)
-
-        # Parse measurement parameters and intensity data. This needs the full
-        # file data for absolute offsets.
-        self._parse_measurement_data(full_data)
-
-        return {
-            'metadata': self.metadata,
-            'scan_params': self.scan_params,
-            'intensities': self.intensities,
-            'angles': self.angles,
-        }
-
-    def _parse_metadata_blocks(self, data: bytes):
-        """
-        Extract metadata blocks (USER, SITE, SAMPLEID, etc.) from binary data.
-
-        Args:
-            data: Raw binary data after header
-        """
-        # Search for known tags
-        for tag_bytes, tag_name in self.METADATA_TAGS.items():
-            pos = data.find(tag_bytes)
-            if pos >= 0:
-                # Read until next tag or null terminator
-                # Metadata values follow the tag, typically null-terminated
-                value_start = pos + len(tag_bytes)
-                value_end = data.find(b'\x0a', value_start, value_start + 200)
-                if value_end < 0:
-                    value_end = data.find(b'\x00\x00', value_start, value_start + 200)
-
-                if value_end > value_start:
-                    value = data[value_start:value_end]
-                    # Strip leading/trailing null bytes, newlines, and spaces.
-                    value_str = value.strip(b'\x00\x0a\x20').decode(
-                        'ascii', errors='ignore'
-                    )
-                    if value_str:
-                        self.metadata[tag_name] = value_str
-
-    def _parse_measurement_data(self, data: bytes):
-        """
-        Extract scan parameters and intensity array from RAW 4.00 format.
-
-        RAW 4.00 format structure (reverse-engineered):
-        - Number of points: uint16 at offset 0x01c3
-        - Step size: float64 at offset 0x020f
-        - Start angle: float64 at offset 0x04fb
-        - Data section: Starts at offset 0x051f (1311 bytes from start)
-        - Intensities: Interleaved float32 pairs
-          [intensity, unknown, intensity, unknown, ...]
-        - End angle: Calculated from start_angle + (num_points - 1) * step_size
-
-        Args:
-            data: Raw binary data (full file contents)
-        """
-        try:
-            # Read number of points from fixed offset (uint16)
-            num_points = struct.unpack('<H', data[0x01C3:0x01C5])[0]
-            self.scan_params['num_points'] = num_points
-            self.logger.info(f'Number of points: {num_points}')
-        except Exception as e:
-            self.logger.error(f'Could not read num_points at 0x01c3: {e}')
-            num_points = None
-
-        try:
-            # Read step size from fixed offset (float64)
-            step_size = struct.unpack('<d', data[0x020F:0x0217])[0]
-            self.scan_params['step_size'] = step_size
-            self.logger.info(f'Step size: {step_size:.10f}°')
-        except Exception as e:
-            self.logger.error(f'Could not read step_size at 0x020f: {e}')
-            step_size = None
-
-        try:
-            # Read start angle from fixed offset (float64 / double precision)
-            start_angle = struct.unpack('<d', data[0x04FB:0x0503])[0]
-            self.scan_params['start_angle'] = start_angle
-            self.logger.info(f'Start angle: {start_angle}°')
-        except Exception as e:
-            self.logger.error(f'Could not read start angle at 0x04fb: {e}')
-            start_angle = None
-        try:
-            # Read scan axis name from fixed offset (null-terminated ASCII string)
-            # At offset 0x04D0 we find the axis name (e.g., "Theta")
-            axis_bytes = data[0x04D0:0x04E0]
-            axis_name = (
-                axis_bytes.split(b'\x00')[0].decode('ascii', errors='ignore').strip()
-            )
-            if axis_name:
-                self.scan_params['scan_axis'] = axis_name
-                self.logger.info(f'Scan axis: {axis_name}')
-        except Exception as e:
-            self.logger.error(f'Could not read scan axis at 0x04d0: {e}')
-
-        try:
-            # Read X-ray tube anode material from fixed offset
-            # (null-terminated ASCII string).
-            # At offset 0x01A8 we find the anode material (e.g., "Cu", "Mo", "Co")
-            # Note: There may be leading null bytes, so we filter them out
-            anode_bytes = data[0x01A8:0x01B0]
-            # Split on null and find first non-empty string
-            anode_material = None
-            for segment in anode_bytes.split(b'\x00'):
-                if segment:
-                    anode_material = segment.decode('ascii', errors='ignore').strip()
-                    break
-
-            if anode_material and anode_material in XRAY_WAVELENGTHS:
-                self.metadata['anode_material'] = anode_material
-                self.logger.info(f'X-ray tube anode: {anode_material}')
-
-                # Add wavelength data from lookup table
-                wavelengths = XRAY_WAVELENGTHS[anode_material]
-                self.metadata['wavelength_kalpha1'] = wavelengths['K_alpha1']
-                self.metadata['wavelength_kalpha2'] = wavelengths['K_alpha2']
-                self.metadata['wavelength_kbeta'] = wavelengths['K_beta']
-                self.metadata['wavelength_kalpha_avg'] = wavelengths['K_alpha_avg']
-                self.metadata['kalpha2_kalpha1_ratio'] = wavelengths[
-                    'K_alpha2_K_alpha1_ratio'
-                ]
-                self.logger.info(f'K-alpha1: {wavelengths["K_alpha1"]} Å')
-                self.logger.info(f'K-alpha2: {wavelengths["K_alpha2"]} Å')
-            elif anode_material:
-                self.logger.warning(
-                    f'Unknown anode material "{anode_material}" - '
-                    'wavelengths not available'
-                )
-                self.metadata['anode_material'] = anode_material
-        except Exception as e:
-            self.logger.warning(f'Could not read anode material at 0x01a8: {e}')
-
-        # Calculate end angle if we have all required parameters
-        if start_angle is not None and step_size is not None and num_points is not None:
-            end_angle = start_angle + (num_points - 1) * step_size
-            self.scan_params['end_angle'] = end_angle
-            self.logger.info(f'Calculated end angle: {end_angle:.6f}°')
-
-            # Generate angle array
-            self.angles = [start_angle + i * step_size for i in range(num_points)]
-
-        # Data section starts at fixed offset 0x051f (1311 bytes from start)
-        data_start_offset = 0x051F
-
-        # Read intensity values (every other float32, starting from data_offset)
-        try:
-            data_section = data[data_start_offset:]
-            data_section_size = len(data) - data_start_offset
-            num_floats = data_section_size // 4
-
-            if num_floats > 0:
-                # Unpack all float32 values
-                all_floats = struct.unpack(
-                    f'<{num_floats}f', data_section[: num_floats * 4]
-                )
-
-                # Extract every other float (the actual intensities)
-                # Pattern discovered: [intensity1, unknown1, intensity2, unknown2, ...]
-                # The unknown values appear to be related but we only need intensities
-                self.intensities = [all_floats[i] for i in range(0, len(all_floats), 2)]
-
-                self.logger.info(f'Extracted {len(self.intensities)} intensity values')
-                if self.intensities:
-                    self.logger.info(
-                        'Intensity range: '
-                        f'{min(self.intensities):.2f} to '
-                        f'{max(self.intensities):.2f}'
-                    )
-
-        except Exception as e:
-            self.logger.error(f'Could not parse intensity data: {e}')
-            self.intensities = []
+        self.metadata.update(voltage=voltage, current=current)
 
     def to_xy_format(self) -> str:
         """

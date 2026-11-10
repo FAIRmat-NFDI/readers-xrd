@@ -239,36 +239,36 @@ class RASXfile:
                 arrays.
         """
         output = collections.defaultdict(list)
-
-        scan_axis = None
-        scan_info = self.get_scan_info()
-        if scan_info:
-            scan_axis = scan_info.get('AxisName', None)
-
-        for scan in self.data:
-            # get intensity and two_theta
-            two_theta, intensity, _ = scan.transpose(1, 0)
-            output['intensity'].append(to_pint_quantity(intensity, None))
-            output['2Theta'].append(
-                to_pint_quantity(
-                    two_theta,
-                    self.units.get(scan_axis, 'deg'),
+        aliases = {
+            'TwoTheta': '2Theta',
+            '2Theta': '2Theta',
+            'TwoThetaOmega': '2Theta',
+            'TwoThetaTheta': '2Theta',
+            'Omega': 'Omega',
+            'Chi': 'Chi',
+            'Phi': 'Phi',
+        }
+        coordinates = []
+        for profile, metadata in zip(self.data, self.meta):
+            info = metadata['ScanInformation']
+            name = info.get('AxisName')
+            if name not in aliases:
+                raise ValueError(f'Unsupported RASX scan axis: {name!r}.')
+            axes = {
+                ('2Theta' if axis.Name == 'TwoTheta' else axis.Name): to_pint_quantity(
+                    np.array([axis.Position]), axis.Unit
                 )
+                for axis in metadata['Axes'].values()
+                if axis.Name in ('TwoTheta', 'Omega', 'Chi', 'Phi', 'X', 'Y')
+                and axis.Position is not None
+            }
+            axes[aliases[name]] = to_pint_quantity(
+                profile[:, 0], info.get('PositionUnit', 'deg')
             )
-
-        for axis in ['Omega', 'Chi', 'Phi', 'X', 'Y']:
-            # get axis positions
-            if axis not in self.positions:
-                output[axis] = None
-                continue
-            if not isinstance(self.positions[axis], np.ndarray):
-                self.positions[axis] = np.array([self.positions[axis]])
-            for axis_data_per_scan in self.positions[axis]:
-                reshaped_axis_data = axis_data_per_scan.reshape(-1)
-                output[axis].append(
-                    to_pint_quantity(reshaped_axis_data, self.units.get(axis, 'deg'))
-                )
-
+            coordinates.append(axes)
+            output['intensity'].append(to_pint_quantity(profile[:, 1], None))
+        for name in set().union(*(row.keys() for row in coordinates)):
+            output[name] = [row.get(name) for row in coordinates]
         return output
 
     def get_scan_info(self):
@@ -363,6 +363,7 @@ class BRMLfile:
                 rdv = dataroute['DataViews']['RawDataView']
                 if not isinstance(rdv, list):
                     rdv = [rdv]
+                recorded_axes = {}
                 for view in rdv:
                     viewtype = view['@xsi:type']
                     vstart = int(view['@Start'])
@@ -373,6 +374,19 @@ class BRMLfile:
                     elif viewtype == 'RecordedRawDataView':
                         vname = view['Recording']['@LogicName']
                         self.data[vname].append(rawdata[vstart : (vstart + vlen)])
+                    elif (
+                        viewtype == 'VaryingRawDataView'
+                        and view['Varying'].get('@LogicName') == 'ScanAxes'
+                        and nsteps > 1
+                    ):
+                        fields = view['Varying']['FieldDefinitions']
+                        if not isinstance(fields, list):
+                            fields = [fields]
+                        for index, field in enumerate(fields):
+                            recorded_axes[field['@FieldName']] = {
+                                'Value': rawdata[vstart + index],
+                                'Unit': field['Restriction']['@Unit'],
+                            }
 
                 self.data['ScanName'].append(scaninfo['@ScanName'])
                 self.data['TimePerStep'].append(scaninfo.get('TimePerStep'))
@@ -388,6 +402,12 @@ class BRMLfile:
                     scanaxes = [scanaxes]
                 for axis in scanaxes:
                     aname = axis['@AxisName']
+                    if aname in recorded_axes:
+                        self.data[aname].extend(
+                            [None] * (i + 1 - len(self.data[aname]))
+                        )
+                        self.data[aname][i] = recorded_axes[aname]
+                        continue
                     aunit = axis['Unit']['@Base']
                     aref = float(axis['Reference'])
                     astart = float(axis['Start']) + aref
@@ -402,7 +422,8 @@ class BRMLfile:
                         # true for 1d scans tested so far
                         adata['Value'] = np.linspace(astart, astop, nsteps)
                     adata['Unit'] = aunit.lower()
-                    self.data[aname].append(adata)
+                    self.data[aname].extend([None] * (i + 1 - len(self.data[aname])))
+                    self.data[aname][i] = adata
 
                 drives = data['RawData']['FixedInformation']['Drives']['InfoData']
                 if not isinstance(drives, list):
@@ -414,7 +435,10 @@ class BRMLfile:
                     adata = {}  # not originally part of Carsten's code
                     adata['Value'] = apos
                     adata['Unit'] = aunit.lower()
-                    self.motors[aname].append(adata)
+                    self.motors[aname].extend(
+                        [None] * (i + 1 - len(self.motors[aname]))
+                    )
+                    self.motors[aname][i] = adata
 
             # (block starts) not originally part of Carsten's code
             try:
@@ -449,39 +473,23 @@ class BRMLfile:
         for scan_intensity in self.data[counter_key[0]]:
             reshaped_intensity = scan_intensity.reshape(-1)
             output['intensity'].append(to_pint_quantity(reshaped_intensity, None))
-        # TwoTheta is list of dicts
-        if 'TwoTheta' not in self.data:
-            output['2Theta'] = None
-        else:
-            for scan_two_theta in self.data['TwoTheta']:
-                scan_two_theta_value = scan_two_theta.get('Value', np.array([]))
-                if not isinstance(scan_two_theta_value, np.ndarray):
-                    scan_two_theta_value = np.array([scan_two_theta_value])
-                scan_two_theta_value = scan_two_theta_value.reshape(-1)
-                output['2Theta'].append(
+        # Prefer recorded/scanned positions per block, not for the whole file.
+        for axis in ['TwoTheta', 'Theta', 'Chi', 'Phi']:
+            scanned, fixed = self.data.get(axis, []), self.motors.get(axis, [])
+            positions = []
+            for index in range(len(output['intensity'])):
+                position = scanned[index] if index < len(scanned) else None
+                if position is None and index < len(fixed):
+                    position = fixed[index]
+                positions.append(
                     to_pint_quantity(
-                        scan_two_theta.get('Value', np.array([])),
-                        scan_two_theta.get('Unit', 'deg'),
+                        np.atleast_1d(position['Value']), position.get('Unit', 'deg')
                     )
+                    if position is not None
+                    else None
                 )
-
-        # Theta is used in place of Omega in the BRML file
-        for axis in ['Theta', 'Chi', 'Phi']:
-            if axis not in self.motors:
-                output[axis] = None
-                continue
-            # each axis is list of dicts
-            for ax_data_per_scan in self.motors[axis]:
-                ax_data_value = ax_data_per_scan.get('Value', np.array([]))
-                if not isinstance(ax_data_value, np.ndarray):
-                    ax_data_value = np.array([ax_data_value])
-                ax_data_value = ax_data_value.reshape(-1)
-                output[axis].append(
-                    to_pint_quantity(
-                        ax_data_value,
-                        ax_data_per_scan.get('Unit', 'deg'),
-                    )
-                )
+            key = '2Theta' if axis == 'TwoTheta' else axis
+            output[key] = positions if any(p is not None for p in positions) else None
 
         return output
 

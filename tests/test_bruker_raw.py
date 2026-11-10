@@ -110,7 +110,8 @@ class TestBrukerRAW4Parser:
 
         # Scan axis should be extracted from file
         assert 'scan_axis' in scan_params
-        assert scan_params['scan_axis'] == 'Theta'  # Expected value for test file
+        # The Locked Coupled range begins at the detector angle.
+        assert scan_params['scan_axis'] == '2Theta'
 
     def test_intensity_extraction(self, sample_raw_file):
         """Test extraction of intensity data."""

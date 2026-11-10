@@ -1,7 +1,7 @@
 {
     "intensity": "(2001,)",
     "2Theta": "(2001,)",
-    "Omega": null,
+    "Omega": "(2001,)",
     "Chi": "(1,)",
     "Phi": "(1,)",
     "countTime": "(1,)",

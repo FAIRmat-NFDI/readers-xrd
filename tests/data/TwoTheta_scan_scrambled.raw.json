@@ -1,17 +1,23 @@
 {
   "2Theta": "(7134,)",
   "intensity": "(7134,)",
-  "scanmotname": "Theta",
+  "counts": null,
+  "countTime": "(1,)",
+  "beamAttenuationFactors": null,
+  "scanmotname": "2Theta",
   "metadata": {
     "sample_id": "HeOx-1001-nsp-sps-900C-10min-01-poliert",
     "scan_type": "line",
-    "scan_axis": "Theta",
+    "scan_axis": "2Theta",
+    "scan_mode": "Locked Coupled",
     "source": {
       "anode_material": "Cu",
-      "kAlpha1": "1.540598",
-      "kAlpha2": "1.544426",
-      "kBeta": "1.39225",
-      "ratioKAlpha2KAlpha1": "0.5"
+      "kAlpha1": 1.5405999422073364,
+      "kAlpha2": null,
+      "kBeta": 1.3922200202941895,
+      "ratioKAlpha2KAlpha1": 0.0,
+      "voltage": "40.0",
+      "current": "40.0"
     }
   }
 }

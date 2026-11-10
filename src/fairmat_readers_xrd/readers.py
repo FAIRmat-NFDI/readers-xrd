@@ -17,7 +17,7 @@
 #
 import collections
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 import numpy as np
 import pint
@@ -70,6 +70,15 @@ def read_file(file_path: str) -> dict:
     raise NotImplementedError('Unknown file type.')
 
 
+def _common_scan_value(values, field, logger):
+    values = set(values)
+    if len(values) == 1:
+        return values.pop()
+    if logger is not None and values:
+        logger.warning(f'Mixed scan {field}; omitting common metadata.')
+    return None
+
+
 @validate_output
 def read_panalytical_xrdml(
     file_path: str, logger: 'BoundLogger' = None
@@ -114,7 +123,7 @@ def read_panalytical_xrdml(
     intensities_array = []
     counts_array = []
 
-    for scan in scans:
+    for scan_index, scan in enumerate(scans):
         data_points = scan.find('xrdml:dataPoints', ns)
         intensities = data_points.find('xrdml:intensities', ns)
         time_element = data_points.find('xrdml:commonCountingTime', ns)
@@ -131,13 +140,13 @@ def read_panalytical_xrdml(
             )
             scaling_factor = attenuation_values[-1]
         else:
-            attenuation_values = None
+            attenuation_values.append(None)
             scaling_factor = 1
         if intensities is not None:
             intensities_array.append(
                 np.fromstring(intensities.text, sep=' ') * ureg.dimensionless
             )
-            counts_array = None
+            counts_array.append(None)
         else:
             counts = data_points.find('xrdml:counts', ns)
             counts_array.append(
@@ -150,31 +159,38 @@ def read_panalytical_xrdml(
 
         for axis in data_points.findall('xrdml:positions', ns):
             name = axis.get('axis')
+            if name not in axes:
+                axes[name] = [None] * len(scans)
             unit = axis.get('unit')
             listed = axis.find('xrdml:listPositions', ns)
             start = axis.find('xrdml:startPosition', ns)
             end = axis.find('xrdml:endPosition', ns)
             common = axis.find('xrdml:commonPosition', ns)
             if listed is not None:
-                axes[name].append(np.fromstring(listed.text, sep=' ') * ureg(unit))
-            elif start is not None and end is not None:
-                axes[name].append(
-                    np.linspace(float(start.text), float(end.text), n_points)
-                    * ureg(unit)
+                axes[name][scan_index] = np.fromstring(listed.text, sep=' ') * ureg(
+                    unit
                 )
+            elif start is not None and end is not None:
+                axes[name][scan_index] = np.linspace(
+                    float(start.text), float(end.text), n_points
+                ) * ureg(unit)
             elif common is not None:
-                axes[name].append(np.array([float(common.text)]) * ureg(unit))
-            else:
-                if logger is not None:
-                    logger.warning('Unknown data for {name} axis.')
-                axes[name].append(None)
+                axes[name][scan_index] = np.array([float(common.text)]) * ureg(unit)
+            elif logger is not None:
+                logger.warning(f'Unknown data for {name} axis.')
 
     scan_data = collections.defaultdict(list)
     scan_data.update(axes)
     scan_data['intensity'] = intensities_array
-    scan_data['counts'] = counts_array
+    scan_data['counts'] = (
+        counts_array if all(value is not None for value in counts_array) else None
+    )
     scan_data['countTime'] = complete_scan_times(counting_time_value, logger)
-    scan_data['beamAttenuationFactors'] = attenuation_values
+    scan_data['beamAttenuationFactors'] = (
+        attenuation_values
+        if all(value is not None for value in attenuation_values)
+        else None
+    )
 
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
@@ -182,7 +198,9 @@ def read_panalytical_xrdml(
     return {
         **modified_scan_data,
         'countTime': modified_scan_data.get('countTime'),
-        'scanmotname': scan.get('scanAxis', None),
+        'scanmotname': _common_scan_value(
+            (s.get('scanAxis') for s in scans), 'axis', logger
+        ),
         'metadata': {
             'sample_id': find_string('xrdml:sample/xrdml:id'),
             'measurement_type': xrd_measurement.get('measurementType', None),
@@ -223,8 +241,12 @@ def read_panalytical_xrdml(
                     '/xrdml:anodeMaterial'
                 ),
             },
-            'scan_mode': scan.get('mode', None),
-            'scan_axis': scan.get('scanAxis', None),
+            'scan_mode': _common_scan_value(
+                (s.get('mode') for s in scans), 'mode', logger
+            ),
+            'scan_axis': _common_scan_value(
+                (s.get('scanAxis') for s in scans), 'axis', logger
+            ),
             'scan_type': scan_type,
         },
     }
@@ -244,7 +266,6 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
         Dict[str, Any]: The X-ray diffraction data in a Python dictionary.
     """
     reader = RASXfile(file_path, verbose=False)
-    scan_info = reader.get_scan_info()
     scan_data = reader.get_scan_data(logger)
     source = reader.get_source_info()
 
@@ -256,7 +277,9 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
     )
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
-    scan_axis = scan_info.get('AxisName')
+    scan_axis = _common_scan_value(
+        (s.get('AxisName') for s in scan_infos), 'axis', logger
+    )
 
     return {
         **modified_scan_data,
@@ -265,7 +288,9 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
             'sample_id': None,
             'scan_axis': scan_axis,
             'scan_type': scan_type,
-            'scan_mode': scan_info.get('Mode'),
+            'scan_mode': _common_scan_value(
+                (s.get('Mode') for s in scan_infos), 'mode', logger
+            ),
             'start_time': scan_infos[0].get('StartTime') if scan_infos else None,
             'end_time': scan_infos[-1].get('EndTime') if scan_infos else None,
             'source': {
@@ -316,9 +341,9 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
         'countTime': modified_scan_data.get('countTime'),
         'metadata': {
             'sample_id': None,
-            'scan_axis': scan_info.get('ScanName', None),
+            'scan_axis': _common_scan_value(reader.data['ScanName'], 'axis', logger),
             'scan_type': scan_type,
-            'scan_mode': scan_info.get('ScanMode'),
+            'scan_mode': _common_scan_value(reader.data['ScanMode'], 'mode', logger),
             'start_time': scan_info.get('start_time'),
             'end_time': scan_info.get('end_time'),
             'source': {
@@ -335,126 +360,34 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
 
 
 @validate_output
-def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
-    """
-    Read Bruker/Siemens RAW v4 binary files using native Python parser.
-
-    This function parses Bruker RAW v4 (magic header "RAW4.00") binary files directly
-    without requiring external conversion tools. All scan parameters (start_angle,
-    step_size, num_points, scan_axis) are extracted directly from the binary file.
-
-    Args:
-        file_path (str): Path to the Bruker .raw file.
-        logger (BoundLogger, optional): Logger instance for warnings/errors.
-
-    Returns:
-        Dict[str, Any]: XRD data dictionary compatible with nomad-measurements
-                        schema.
-
-    Raises:
-        ValueError: If the 2Theta scan cannot be built (missing start angle,
-            step size, number of points or intensities).
-
-    Note:
-        - Only RAW v4 format is currently supported
-        - Designed for single-axis theta-2theta powder diffraction scans
-        - Multi-axis scans (texture, pole figures) may not parse correctly
-        - All scan parameters are extracted from the binary file
-        - No external files (.xrdml) are required
-
-    Citation for RAW format understanding:
-        Siemens/Bruker RAW format is proprietary but reverse-engineered
-        for open science data management. Based on DIFFRAC.EVA output files.
-    """
-    try:
-        # Parse the RAW file - all parameters are extracted from the file
-        parser = BrukerRAW4Parser(file_path)
-        raw_data = parser.parse()
-        if not parser.angles or not parser.intensities:
-            raise ValueError(
-                'start angle, step size, number of points or intensities '
-                'are missing, so the 2Theta scan cannot be built'
-            )
-        # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
-        # (list of arrays, like XRDML parser does)
-        scan_data = {
-            '2Theta': [np.array(parser.angles) * ureg.degree],
-            'intensity': [np.array(parser.intensities) * ureg.dimensionless],
-            'counts': None,
-            'countTime': None,
-            'beamAttenuationFactors': None,
-        }
-
-        # Detect scan type and modify data accordingly (like other readers)
-        scan_type = detect_scan_type(scan_data)
-        modified_scan_data = modify_scan_data(scan_data, scan_type)
-
-        # Build metadata dictionary
-        # Extract scan axis from raw data (e.g., "Theta")
-        scan_axis = raw_data['scan_params'].get('scan_axis', '')
-
-        # Build source metadata if anode material was found
-        source_metadata = {}
-        if 'anode_material' in raw_data['metadata']:
-            raw_metadata = raw_data['metadata']
-
-            # The RAW file does not store wavelengths or their unit. The parser takes
-            # them from its XRAY_WAVELENGTHS table (bruker_raw_parser.py), which is
-            # given in angstrom.
-
-            def to_quantity(key, unit):
-                value = raw_metadata.get(key)
-                return None if value is None else value * ureg(unit)
-
-            source_metadata = {
-                'anode_material': raw_metadata['anode_material'],
-                'kAlpha1': to_quantity('wavelength_kalpha1', 'angstrom'),
-                'kAlpha2': to_quantity('wavelength_kalpha2', 'angstrom'),
-                'kBeta': to_quantity('wavelength_kbeta', 'angstrom'),
-                'ratioKAlpha2KAlpha1': to_quantity(
-                    'kalpha2_kalpha1_ratio', 'dimensionless'
-                ),
-            }
-        metadata = {
-            'sample_id': raw_data['metadata'].get('sample_id'),
-            'scan_type': scan_type,
-            'scan_axis': scan_axis,  # Extracted from RAW file at offset 0x04D0
-            'source': source_metadata,  # Anode material and wavelengths from lookup
-            # table
-        }
-
-        # Return data in the same format as read_panalytical_xrdml
-        # Use scan_axis as scanmotname (e.g., "Theta")
-        return {
-            **modified_scan_data,
-            'scanmotname': scan_axis,  # Extracted from RAW file at offset 0x04D0
-            'metadata': metadata,
-        }
-
-    except Exception as e:
-        if logger:
-            logger.error(
-                f'Failed to parse Bruker/Siemens .raw file {file_path}: {str(e)}. '
-                f'The file may be corrupted or in an unsupported format.'
-            )
-        raise
-
-
-def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
-    """
-    Function for reading the X-ray diffraction data in a Nexus file.
-
-    Args:
-        file_path (str): The path to the X-ray diffraction data file.
-        logger (BoundLogger, optional): A structlog logger. Defaults to None.
-
-    Returns:
-        Dict[str, Any]: The X-ray diffraction data in a Python dictionary.
-    """
-    nxdl_name = 'NXxrd_pan'
-    xrd_template = transfer_data_into_template(
-        nxdl_name=nxdl_name,
-        input_file=file_path,
-        reader='xrd',
-    )
-    return xrd_template
+def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
+    """Read the validated single-range RAW4 powder geometry and native metadata."""
+    parser = BrukerRAW4Parser(file_path)
+    if logger is not None:
+        parser.logger = logger
+    raw = parser.parse()
+    meta, params = raw['metadata'], raw['scan_params']
+    source = {
+        'anode_material': meta.get('anode_material'),
+        'kAlpha1': meta.get('wavelength_kalpha1'),
+        'kAlpha2': meta.get('wavelength_kalpha2'),
+        'kBeta': meta.get('wavelength_kbeta'),
+        'ratioKAlpha2KAlpha1': meta.get('kalpha2_kalpha1_ratio'),
+        'voltage': meta['voltage'] * ureg.kilovolt,
+        'current': meta['current'] * ureg.milliampere,
+    }
+    return {
+        '2Theta': np.asarray(parser.angles) * ureg.degree,
+        'intensity': np.asarray(parser.intensities) * ureg.dimensionless,
+        'counts': None,
+        'countTime': counting_time(params.get('counting_time_ms'), 'ms', logger),
+        'beamAttenuationFactors': None,
+        'scanmotname': params['scan_axis'],
+        'metadata': dict(
+            sample_id=meta.get('sample_id'),
+            scan_type='line',
+            scan_axis=params['scan_axis'],
+            scan_mode=params['scan_mode'],
+            source=source,
+        ),
+    }
