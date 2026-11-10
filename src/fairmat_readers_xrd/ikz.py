@@ -153,7 +153,7 @@ class RASXfile:
                 with fh.open(profile) as f:
                     ## python >= 3.7:
                     f.seek(3)  # skip the 3 non-ascii symbols at the start
-                    data.append(np.loadtxt(f))
+                    data.append(np.loadtxt(f, ndmin=2))
                     ## the ugly way to stay python < 3.7 compatible:
                     # _content = BytesIO(f.read()[3:])
                     # data.append(np.loadtxt(_content))
@@ -285,30 +285,26 @@ class RASXfile:
         Collects meta information of the X-ray source along with associated units.
 
         Returns:
-            Dict[str, Any]: Each dict item contains a list with numerical value
-                (float or int) at index 0 and unit (str) at index 1. One exception
-                is the item with key 'TargetName' which has str at both indices.
-                If quantity is not available, the dict item will default to [].
+            Dict[str, Any]: Available source quantities with units and the target
+                name as a string. Missing quantities are omitted.
         """
-        output = collections.defaultdict(list)
-        source = collections.defaultdict(
-            list, self.meta[0]['HardwareConfig']['xraygenerator']
-        )
+        output = {}
+        source = self.meta[0]['HardwareConfig']['xraygenerator']
 
-        if source['TargetName']:
+        if source.get('TargetName') is not None:
             output['TargetName'] = source['TargetName']
-        if source['Voltage']:
+        if source.get('Voltage') is not None:
             output['Voltage'] = to_pint_quantity(
                 source['Voltage'],
                 source.get('VoltageUnit', 'kV'),
             )
-        if source['Current']:
+        if source.get('Current') is not None:
             output['Current'] = to_pint_quantity(
                 source['Current'],
                 source.get('CurrentUnit', 'mA'),
             )
         for wavelength in ['WavelengthKalpha1', 'WavelengthKalpha2', 'WavelengthKbeta']:
-            if source[wavelength]:
+            if source.get(wavelength) is not None:
                 output[wavelength] = to_pint_quantity(
                     source[wavelength],
                     source.get(wavelength + 'Unit', 'angstrom'),
@@ -514,12 +510,10 @@ class BRMLfile:
         Collects meta information of the X-ray source along with associated units.
 
         Returns:
-            Dict[str, Any]: Each dict item contains a list with numerical value
-                (float or int) at index 0 and unit (str) at index 1. One exception
-                is the item with key 'TubeMaterial' which has str at both indices.
-                If quantity is not available, the dict item will default to [].
+            Dict[str, Any]: Available source quantities with units and the tube
+                material as a string. Missing quantities are omitted.
         """
-        output = collections.defaultdict(list)
+        output = {}
 
         source = {}
         for component in self.mounted_optics_info:

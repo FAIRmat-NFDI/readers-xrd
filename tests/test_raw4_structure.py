@@ -101,6 +101,45 @@ def test_raw4_rejects_unsupported_or_incomplete_data(tmp_path, bad):
         read_bruker_raw(str(path))
 
 
+@pytest.mark.parametrize('points', [1, 2, 5])
+def test_rasx_profile_preserves_point_and_column_dimensions(tmp_path, points):
+    source = Path(__file__).parent / 'data/TwoTheta_scan_powder.rasx'
+    with ZipFile(source) as archive:
+        profile = next(n for n in archive.namelist() if 'Profile' in n)
+        conditions = profile.replace('Profile', 'MesurementConditions')[:-4] + '.xml'
+        root = ET.fromstring(archive.read(conditions))
+    angles = 15 + np.arange(points) * 0.25
+    intensity = 2.5 + np.arange(points)
+    info = root.find('ScanInformation')
+    for field, value in dict(
+        Mode='STEP',
+        Start=angles[0],
+        Stop=angles[-1],
+        Step=0.25,
+        Speed=1,
+        SpeedUnit='s',
+        DataCount=points,
+    ).items():
+        info.find(field).text = str(value)
+    for axis in root.find('Axes'):
+        if axis.get('Name') == 'TwoTheta':
+            axis.set('Position', str(angles[0]))
+            axis.set('EndPosition', str(angles[-1]))
+    path = tmp_path / 'profile.rasx'
+    with ZipFile(path, 'w') as archive:
+        rows = ''.join(
+            f'{angle}\t{value}\t1\n' for angle, value in zip(angles, intensity)
+        )
+        archive.writestr(profile, rows.encode('utf-8-sig'))
+        archive.writestr(conditions, ET.tostring(root))
+    result = read_rigaku_rasx(str(path))
+    assert result['metadata']['scan_type'] == 'line'
+    assert result['intensity'].shape == (points,)
+    assert result['2Theta'].shape == (points,)
+    np.testing.assert_array_equal(result['intensity'].magnitude, intensity)
+    np.testing.assert_array_equal(result['2Theta'].to('degree').magnitude, angles)
+
+
 def test_rasx_omega_profile_is_not_two_theta(tmp_path):
     source = Path(__file__).parent / 'data/TwoTheta_scan_powder.rasx'
     with ZipFile(source) as archive:

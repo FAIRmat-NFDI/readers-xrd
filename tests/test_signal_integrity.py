@@ -25,7 +25,11 @@ import numpy as np
 import pint
 import pytest
 
-from fairmat_readers_xrd import read_bruker_brml, read_panalytical_xrdml
+from fairmat_readers_xrd import (
+    read_bruker_brml,
+    read_panalytical_xrdml,
+    read_rigaku_rasx,
+)
 from fairmat_readers_xrd.utils import detect_scan_type, modify_scan_data
 
 ureg = pint.get_application_registry()
@@ -130,3 +134,74 @@ def test_brml_omega_matches_recorded_scan_coordinates(tmp_path):
     np.testing.assert_array_equal(
         result['Omega'].to('degree').magnitude, recorded[:, index]
     )
+
+
+@pytest.mark.parametrize(
+    ('filename', 'reader', 'container'),
+    [
+        ('TwoTheta_scan_powder.rasx', read_rigaku_rasx, 'XrayGenerator'),
+        ('23-012-AG_2thomegascan_long.brml', read_bruker_brml, 'Tube'),
+    ],
+)
+@pytest.mark.parametrize(
+    'change', ['missing_beta', 'missing_optional', 'zero_generator']
+)
+def test_optional_source_metadata_preserves_signal_and_valid_values(
+    tmp_path, filename, reader, container, change
+):
+    original = Path(__file__).parent / 'data' / filename
+    baseline = reader(str(original))
+    changed = tmp_path / filename
+    optional = {
+        'Voltage',
+        'Current',
+        'WavelengthKalpha2',
+        'WavelengthKbeta',
+        'WaveLengthAlpha2',
+        'WaveLengthBeta',
+        'WaveLengthRatio',
+    }
+    with ZipFile(original) as source, ZipFile(changed, 'w') as target:
+        for name in source.namelist():
+            content = source.read(name)
+            if name.endswith('.xml'):
+                root = ET.fromstring(content)
+                for tube in root.findall(f'.//{container}'):
+                    for parent in tube.iter():
+                        for child in list(parent):
+                            if (
+                                change == 'missing_beta'
+                                and child.tag in ('WavelengthKbeta', 'WaveLengthBeta')
+                            ) or (
+                                change == 'missing_optional' and child.tag in optional
+                            ):
+                                parent.remove(child)
+                            elif change == 'zero_generator' and child.tag in (
+                                'Voltage',
+                                'Current',
+                            ):
+                                if container == 'Tube':
+                                    child.set('Value', '0')
+                                else:
+                                    child.text = '0'
+                content = ET.tostring(root)
+            target.writestr(name, content)
+
+    result = reader(str(changed))
+    np.testing.assert_array_equal(
+        result['intensity'].magnitude, baseline['intensity'].magnitude
+    )
+    source = result['metadata']['source']
+    for field, expected in baseline['metadata']['source'].items():
+        if change == 'missing_beta' and field == 'kBeta':
+            assert source[field] is None
+        elif change == 'missing_optional' and field not in (
+            'anode_material',
+            'kAlpha1',
+        ):
+            assert source[field] is None
+        elif change == 'zero_generator' and field in ('voltage', 'current'):
+            assert source[field].magnitude == 0
+            assert source[field].units == expected.units
+        else:
+            assert source[field] == expected
