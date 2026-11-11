@@ -18,7 +18,7 @@
 """Pydantic models describing the output of every `read_*` function."""
 
 import functools
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 import pint
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -32,10 +32,10 @@ class XRDSource(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
     anode_material: Optional[str] = None
-    kAlpha1: Optional[Union[Quantity, float]] = None
-    kAlpha2: Optional[Union[Quantity, float]] = None
-    kBeta: Optional[Union[Quantity, float]] = None
-    ratioKAlpha2KAlpha1: Optional[Union[Quantity, float]] = None
+    kAlpha1: Optional[Quantity] = None
+    kAlpha2: Optional[Quantity] = None
+    kBeta: Optional[Quantity] = None
+    ratioKAlpha2KAlpha1: Optional[Quantity] = None
     voltage: Optional[Quantity] = None
     current: Optional[Quantity] = None
 

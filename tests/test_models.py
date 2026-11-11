@@ -98,3 +98,13 @@ def test_unknown_nested_field_raises():
     output['metadata'] = {'source': {'kalpha1': 1.5}}
     with pytest.raises(ValidationError, match='kalpha1'):
         XRDOutput.model_validate(output)
+
+
+@pytest.mark.parametrize(
+    'field', ['kAlpha1', 'kAlpha2', 'kBeta', 'ratioKAlpha2KAlpha1']
+)
+def test_source_values_must_be_quantities(field):
+    output = _minimal_output()
+    output['metadata'] = {'source': {field: 1.5}}
+    with pytest.raises(ValidationError, match=field):
+        XRDOutput.model_validate(output)

@@ -337,6 +337,17 @@ class TestBrukerRawIntegration:
         )
 
 
+def test_raw_wavelengths_are_quantities():
+    """The RAW reader returns wavelengths in angstrom, like the other readers."""
+    source = read_bruker_raw('tests/data/TwoTheta_scan_scrambled.raw')['metadata'][
+        'source'
+    ]
+    for key in ['kAlpha1', 'kAlpha2', 'kBeta']:
+        assert source[key].units == ureg.angstrom
+    assert source['kAlpha1'].magnitude == pytest.approx(1.540598)
+    assert source['ratioKAlpha2KAlpha1'].units == ureg.dimensionless
+
+
 # Parametric tests for different scenarios
 @pytest.mark.parametrize('step_size', [0.01, 0.02, 0.05])
 def test_different_step_sizes(step_size):

@@ -8,10 +8,10 @@
     "scan_axis": "Theta",
     "source": {
       "anode_material": "Cu",
-      "kAlpha1": 1.540598,
-      "kAlpha2": 1.544426,
-      "kBeta": 1.39225,
-      "ratioKAlpha2KAlpha1": 0.5
+      "kAlpha1": "1.540598",
+      "kAlpha2": "1.544426",
+      "kBeta": "1.39225",
+      "ratioKAlpha2KAlpha1": "0.5"
     }
   }
 }
