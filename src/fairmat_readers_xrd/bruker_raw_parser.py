@@ -15,7 +15,7 @@ License: MIT
 import logging
 import struct
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 # X-ray wavelength reference table (in Angstroms)
 # Source: International Tables for Crystallography, Volume C
@@ -117,7 +117,7 @@ class BrukerRAW4Parser:
         self.angles = None
         self.logger = logging.getLogger(__name__)
 
-    def parse(self) -> Dict[str, Any]:
+    def parse(self) -> dict[str, Any]:
         """
         Parse the RAW file and extract all data.
 
@@ -376,7 +376,7 @@ class BrukerRAW4Parser:
         return '\n'.join(lines)
 
 
-def read_bruker_raw4(filepath: str) -> Dict[str, Any]:
+def read_bruker_raw4(filepath: str) -> dict[str, Any]:
     """
     Read a Bruker/Siemens RAW v4 file.
 
@@ -395,7 +395,7 @@ def read_bruker_raw4(filepath: str) -> Dict[str, Any]:
     return parser.parse()
 
 
-def convert_raw_to_xy(raw_filepath: str, xy_filepath: Optional[str] = None) -> str:
+def convert_raw_to_xy(raw_filepath: str, xy_filepath: str | None = None) -> str:
     """
     Convert Bruker RAW v4 .raw file to simple XY format.
 
