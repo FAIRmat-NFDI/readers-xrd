@@ -101,7 +101,8 @@ def test_unknown_nested_field_raises():
 
 
 @pytest.mark.parametrize(
-    'field', ['kAlpha1', 'kAlpha2', 'kBeta', 'ratioKAlpha2KAlpha1']
+    'field',
+    ['kAlpha1', 'kAlpha2', 'kBeta', 'ratioKAlpha2KAlpha1', 'voltage', 'current'],
 )
 def test_source_values_must_be_quantities(field):
     output = _minimal_output()

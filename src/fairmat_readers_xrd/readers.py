@@ -381,6 +381,10 @@ def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, A
         if 'anode_material' in raw_data['metadata']:
             raw_metadata = raw_data['metadata']
 
+            # The RAW file does not store wavelengths or their unit. The parser takes
+            # them from its XRAY_WAVELENGTHS table (bruker_raw_parser.py), which is
+            # given in angstrom.
+
             def to_quantity(key, unit):
                 value = raw_metadata.get(key)
                 return None if value is None else value * ureg(unit)
