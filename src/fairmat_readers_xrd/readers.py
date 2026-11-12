@@ -17,7 +17,7 @@
 #
 import collections
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pint
@@ -68,7 +68,7 @@ def read_file(file_path: str) -> dict:
 @validate_output
 def read_panalytical_xrdml(
     file_path: str, logger: 'BoundLogger' = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Function for reading the X-ray diffraction data in a Panalytical `.xrdml` file.
 
@@ -220,7 +220,7 @@ def read_panalytical_xrdml(
 
 
 @validate_output
-def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
+def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
     """
     Reads .rasx files from Rigaku instruments
         - reader is based on IKZ module
@@ -275,7 +275,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
 
 
 @validate_output
-def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
+def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
     """
     Reads .brml files from Bruker instruments
         - reader is based on IKZ module
@@ -318,7 +318,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, 
 
 
 @validate_output
-def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
+def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
     """
     Read Bruker/Siemens RAW v4 binary files using native Python parser.
 
@@ -423,7 +423,7 @@ def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, A
         raise
 
 
-def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
+def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
     """
     Function for reading the X-ray diffraction data in a Nexus file.
 

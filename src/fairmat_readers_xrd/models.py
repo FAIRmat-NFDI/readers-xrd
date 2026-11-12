@@ -18,7 +18,8 @@
 """Pydantic models describing the output of every `read_*` function."""
 
 import functools
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 import pint
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -31,13 +32,13 @@ class XRDSource(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
-    anode_material: Optional[str] = None
-    kAlpha1: Optional[Quantity] = None
-    kAlpha2: Optional[Quantity] = None
-    kBeta: Optional[Quantity] = None
-    ratioKAlpha2KAlpha1: Optional[Quantity] = None
-    voltage: Optional[Quantity] = None
-    current: Optional[Quantity] = None
+    anode_material: str | None = None
+    kAlpha1: Quantity | None = None
+    kAlpha2: Quantity | None = None
+    kBeta: Quantity | None = None
+    ratioKAlpha2KAlpha1: Quantity | None = None
+    voltage: Quantity | None = None
+    current: Quantity | None = None
 
 
 class XRDMetadata(BaseModel):
@@ -45,15 +46,15 @@ class XRDMetadata(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
-    sample_id: Optional[str] = None
-    measurement_type: Optional[str] = None
-    sample_mode: Optional[str] = None
-    instrument_id: Optional[str] = None
-    start_time: Optional[str] = None
-    scan_mode: Optional[str] = None
-    scan_axis: Optional[str] = None
-    scan_type: Optional[str] = None
-    source: Optional[XRDSource] = None
+    sample_id: str | None = None
+    measurement_type: str | None = None
+    sample_mode: str | None = None
+    instrument_id: str | None = None
+    start_time: str | None = None
+    scan_mode: str | None = None
+    scan_axis: str | None = None
+    scan_type: str | None = None
+    source: XRDSource | None = None
 
 
 class XRDOutput(BaseModel):
@@ -63,17 +64,17 @@ class XRDOutput(BaseModel):
 
     two_theta: Quantity = Field(alias='2Theta')
     intensity: Quantity
-    Omega: Optional[Quantity] = None
-    Chi: Optional[Quantity] = None
-    Phi: Optional[Quantity] = None
-    X: Optional[Quantity] = None
-    Y: Optional[Quantity] = None
-    Z: Optional[Quantity] = None
-    counts: Optional[Quantity] = None
-    countTime: Optional[Quantity] = None
-    beamAttenuationFactors: Optional[Quantity] = None
-    scanmotname: Optional[str] = None
-    metadata: Optional[XRDMetadata] = None
+    Omega: Quantity | None = None
+    Chi: Quantity | None = None
+    Phi: Quantity | None = None
+    X: Quantity | None = None
+    Y: Quantity | None = None
+    Z: Quantity | None = None
+    counts: Quantity | None = None
+    countTime: Quantity | None = None
+    beamAttenuationFactors: Quantity | None = None
+    scanmotname: str | None = None
+    metadata: XRDMetadata | None = None
 
     @model_validator(mode='after')
     def intensity_matches_two_theta(self):
@@ -96,7 +97,7 @@ def validate_output(reader: Callable) -> Callable:
     """
 
     @functools.wraps(reader)
-    def wrapper(*args, **kwargs) -> Dict[str, Any]:
+    def wrapper(*args, **kwargs) -> dict[str, Any]:
         output = reader(*args, **kwargs)
         XRDOutput.model_validate(output)
         return output
