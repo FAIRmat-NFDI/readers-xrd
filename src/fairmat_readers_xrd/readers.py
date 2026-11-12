@@ -379,16 +379,25 @@ def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, A
         # Build source metadata if anode material was found
         source_metadata = {}
         if 'anode_material' in raw_data['metadata']:
+            raw_metadata = raw_data['metadata']
+
+            # The RAW file does not store wavelengths or their unit. The parser takes
+            # them from its XRAY_WAVELENGTHS table (bruker_raw_parser.py), which is
+            # given in angstrom.
+
+            def to_quantity(key, unit):
+                value = raw_metadata.get(key)
+                return None if value is None else value * ureg(unit)
+
             source_metadata = {
-                'anode_material': raw_data['metadata']['anode_material'],
-                'kAlpha1': raw_data['metadata'].get('wavelength_kalpha1'),
-                'kAlpha2': raw_data['metadata'].get('wavelength_kalpha2'),
-                'kBeta': raw_data['metadata'].get('wavelength_kbeta'),
-                'ratioKAlpha2KAlpha1': raw_data['metadata'].get(
-                    'kalpha2_kalpha1_ratio'
+                'anode_material': raw_metadata['anode_material'],
+                'kAlpha1': to_quantity('wavelength_kalpha1', 'angstrom'),
+                'kAlpha2': to_quantity('wavelength_kalpha2', 'angstrom'),
+                'kBeta': to_quantity('wavelength_kbeta', 'angstrom'),
+                'ratioKAlpha2KAlpha1': to_quantity(
+                    'kalpha2_kalpha1_ratio', 'dimensionless'
                 ),
             }
-
         metadata = {
             'sample_id': raw_data['metadata'].get('sample_id'),
             'scan_type': scan_type,

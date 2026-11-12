@@ -33,10 +33,10 @@ class XRDSource(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
     anode_material: str | None = None
-    kAlpha1: Quantity | float | None = None
-    kAlpha2: Quantity | float | None = None
-    kBeta: Quantity | float | None = None
-    ratioKAlpha2KAlpha1: Quantity | float | None = None
+    kAlpha1: Quantity | None = None
+    kAlpha2: Quantity | None = None
+    kBeta: Quantity | None = None
+    ratioKAlpha2KAlpha1: Quantity | None = None
     voltage: Quantity | None = None
     current: Quantity | None = None
 
