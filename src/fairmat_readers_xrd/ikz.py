@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         BoundLogger,
     )
 
-from fairmat_readers_xrd.utils import to_pint_quantity
+from fairmat_readers_xrd.utils import intensity_quantity, to_pint_quantity
 
 
 def try_scalar(val):
@@ -58,6 +58,9 @@ def parse_rasx_metadata(xml):
     for category in hwconf.find('Categories'):
         optics[category.attrib['Name']] = category.attrib['SelectedUnit']
     optics['Monochromator'] = [child.text for child in hwconf.find('Optics')]
+    hwdict['optics_settings'] = {
+        child.tag: child.text for child in hwconf.find('Optics')
+    }
     hwdict['Detector'] = optics['Detector']
 
     distances = hwdict['distances'] = []
@@ -141,6 +144,7 @@ class RASXfile:
             numscans = len(profiles)
             data = []
             meta = []
+            self.metadata_paths = []
             for i in range(numscans):
                 if verbose:
                     if not i:
@@ -159,6 +163,7 @@ class RASXfile:
                     # data.append(np.loadtxt(_content))
                 with fh.open(metafile) as xml:
                     meta.append(parse_rasx_metadata(xml))
+                    self.metadata_paths.append(metafile)
 
             ## loading images if available
             images = [f.filename for f in fh.filelist if 'Image' in f.filename]
@@ -177,6 +182,7 @@ class RASXfile:
 
                 with fh.open(metafile) as xml:
                     meta.append(parse_rasx_metadata(xml))
+                    self.metadata_paths.append(metafile)
                 optics = meta[-1]['HardwareConfig']['optics']
                 if optics['Detector'] == 'HyPix3000(H)':
                     det_shape = 385, 775
@@ -266,7 +272,9 @@ class RASXfile:
                 profile[:, 0], info.get('PositionUnit', 'deg')
             )
             coordinates.append(axes)
-            output['intensity'].append(to_pint_quantity(profile[:, 1], None))
+            output['intensity'].append(
+                intensity_quantity(profile[:, 1], info.get('IntensityUnit'))
+            )
         for name in set().union(*(row.keys() for row in coordinates)):
             output[name] = [row.get(name) for row in coordinates]
         return output
@@ -338,6 +346,8 @@ class BRMLfile:
 
             self.data = collections.defaultdict(list)
             self.motors = collections.defaultdict(list)
+            self.fixed_information = []
+            self.signal_units = collections.defaultdict(list)
             for i, rawpath in enumerate(rawlist):
                 if verbose:
                     if not i:
@@ -347,6 +357,9 @@ class BRMLfile:
                 with fh.open(rawpath, 'r') as xml:
                     # entering RawData<int>.xml
                     data = xmltodict.parse(xml.read(), encoding=encoding)
+                self.fixed_information.append(
+                    {'path': rawpath, 'value': data['RawData']['FixedInformation']}
+                )
                 dataroute = data['RawData']['DataRoutes']['DataRoute']
                 scaninfo = dataroute['ScanInformation']
                 nsteps = int(scaninfo['MeasurementPoints'])
@@ -367,9 +380,13 @@ class BRMLfile:
                     if viewtype == 'FixedRawDataView':
                         vname = view['@LogicName']
                         self.data[vname].append(rawdata[vstart : (vstart + vlen)])
+                        self.signal_units[vname].append(view.get('Unit', {}))
                     elif viewtype == 'RecordedRawDataView':
                         vname = view['Recording']['@LogicName']
                         self.data[vname].append(rawdata[vstart : (vstart + vlen)])
+                        self.signal_units[vname].append(
+                            view['Recording'].get('Unit', {})
+                        )
                     elif (
                         viewtype == 'VaryingRawDataView'
                         and view['Varying'].get('@LogicName') == 'ScanAxes'
@@ -466,9 +483,15 @@ class BRMLfile:
         if len(counter_key) > 1:
             raise ValueError('More than one intensity counters found.')
 
-        for scan_intensity in self.data[counter_key[0]]:
+        signal_units = getattr(self, 'signal_units', {}).get(counter_key[0], [])
+        for index, scan_intensity in enumerate(self.data[counter_key[0]]):
             reshaped_intensity = scan_intensity.reshape(-1)
-            output['intensity'].append(to_pint_quantity(reshaped_intensity, None))
+            units = signal_units[index] if index < len(signal_units) else {}
+            output['intensity'].append(
+                intensity_quantity(
+                    reshaped_intensity, units.get('@Base'), prefix=units.get('@Prefix')
+                )
+            )
         # Prefer recorded/scanned positions per block, not for the whole file.
         for axis in ['TwoTheta', 'Theta', 'Chi', 'Phi']:
             scanned, fixed = self.data.get(axis, []), self.motors.get(axis, [])

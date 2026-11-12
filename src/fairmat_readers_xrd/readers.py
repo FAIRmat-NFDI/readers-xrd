@@ -25,6 +25,12 @@ import pint
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
 from fairmat_readers_xrd.models import validate_output
+from fairmat_readers_xrd.metadata import (
+    brml_metadata,
+    rasx_metadata,
+    raw_metadata,
+    xrdml_metadata,
+)
 from fairmat_readers_xrd.timing import (
     complete_scan_times,
     counting_time,
@@ -34,6 +40,7 @@ from fairmat_readers_xrd.timing import (
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
     detect_scan_type,
+    intensity_quantity,
     modify_scan_data,
 )
 
@@ -127,6 +134,8 @@ def read_panalytical_xrdml(
         data_points = scan.find('xrdml:dataPoints', ns)
         intensities = data_points.find('xrdml:intensities', ns)
         time_element = data_points.find('xrdml:commonCountingTime', ns)
+        if time_element is None:
+            time_element = data_points.find('xrdml:countingTimes', ns)
         attenuation = data_points.find('xrdml:beamAttenuationFactors', ns)
 
         counting_time_value.append(
@@ -144,14 +153,20 @@ def read_panalytical_xrdml(
             scaling_factor = 1
         if intensities is not None:
             intensities_array.append(
-                np.fromstring(intensities.text, sep=' ') * ureg.dimensionless
+                intensity_quantity(
+                    np.fromstring(intensities.text, sep=' '), intensities.get('unit')
+                )
             )
             counts_array.append(None)
         else:
             counts = data_points.find('xrdml:counts', ns)
             counts_array.append(
-                np.fromstring(counts.text, sep=' ') * ureg.dimensionless
+                intensity_quantity(
+                    np.fromstring(counts.text, sep=' '), counts.get('unit')
+                )
             )
+            if not counts_array[-1].is_compatible_with('dimensionless'):
+                raise ValueError('XRDML counts must have count units, not rate units.')
             intensities_array.append(
                 counts_array[-1] * scaling_factor * ureg.dimensionless
             )
@@ -181,6 +196,11 @@ def read_panalytical_xrdml(
 
     scan_data = collections.defaultdict(list)
     scan_data.update(axes)
+    if any(
+        not signal.is_compatible_with(intensities_array[0])
+        for signal in intensities_array[1:]
+    ):
+        raise ValueError('Mixed counts and count-rate scans are not supported.')
     scan_data['intensity'] = intensities_array
     scan_data['counts'] = (
         counts_array if all(value is not None for value in counts_array) else None
@@ -202,6 +222,7 @@ def read_panalytical_xrdml(
             (s.get('scanAxis') for s in scans), 'axis', logger
         ),
         'metadata': {
+            'details': xrdml_metadata(root, ns, logger),
             'sample_id': find_string('xrdml:sample/xrdml:id'),
             'measurement_type': xrd_measurement.get('measurementType', None),
             'sample_mode': xrd_measurement.get('sampleMode', None),
@@ -285,6 +306,7 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
         **modified_scan_data,
         'countTime': modified_scan_data.get('countTime'),
         'metadata': {
+            'details': rasx_metadata(reader, logger),
             'sample_id': None,
             'scan_axis': scan_axis,
             'scan_type': scan_type,
@@ -340,6 +362,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
         **modified_scan_data,
         'countTime': modified_scan_data.get('countTime'),
         'metadata': {
+            'details': brml_metadata(reader, logger),
             'sample_id': None,
             'scan_axis': _common_scan_value(reader.data['ScanName'], 'axis', logger),
             'scan_type': scan_type,
@@ -384,6 +407,7 @@ def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, A
         'beamAttenuationFactors': None,
         'scanmotname': params['scan_axis'],
         'metadata': dict(
+            details=raw_metadata(meta),
             sample_id=meta.get('sample_id'),
             scan_type='line',
             scan_axis=params['scan_axis'],

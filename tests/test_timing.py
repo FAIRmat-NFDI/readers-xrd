@@ -76,6 +76,7 @@ def test_rasx_uses_time_of_each_scan_without_channel_expansion(monkeypatch):
     reader = SimpleNamespace(
         data=[None, None],
         meta=[{'ScanInformation': info} for info in infos],
+        metadata_paths=['Data0/first.xml', 'Data0/second.xml'],
         get_scan_info=lambda: infos[0],
         get_scan_data=lambda logger: scan_data,
         get_source_info=lambda: source,

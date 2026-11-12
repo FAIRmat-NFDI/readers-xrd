@@ -25,6 +25,31 @@ ureg = pint.get_application_registry()
 MAX_SUPPORTED_INTENSITY_DIMENSIONS = 2
 
 
+def intensity_quantity(values, unit=None, *, prefix=None):
+    """Decode counts or an explicit count rate without normalizing by time."""
+    aliases = {
+        'counts': 'count',
+        'cts': 'count',
+        'cps': 'count/s',
+        'countspersecond': 'count/s',
+        'countpersecond': 'count/s',
+        'counts/s': 'count/s',
+        'cts/s': 'count/s',
+    }
+    unit = aliases.get(str(unit).casefold().replace(' ', ''), unit)
+    try:
+        signal = np.asarray(values, dtype=float) * ureg(unit or 'dimensionless')
+        if prefix and prefix.casefold() != 'none':
+            signal *= ureg(prefix.lower() + 'count').to('count').magnitude
+        if signal.is_compatible_with('dimensionless'):
+            return signal.to('dimensionless')
+        if signal.is_compatible_with('count/s'):
+            return signal.to('count/s')
+    except pint.errors.PintError as error:
+        raise ValueError(f'Invalid XRD signal unit: {unit!r}.') from error
+    raise ValueError(f'Unsupported XRD signal unit: {unit!r}.')
+
+
 def to_pint_quantity(value: Any = None, unit: str = None) -> Any:
     """
     Attempts to generate a pint quantity.
@@ -187,7 +212,9 @@ def modify_scan_data(scan_data: dict, scan_type: str):
             if value is None:
                 continue
             data = np.array([item.to(value[0].units).magnitude for item in value])
-            if key in ('intensity', 'counts'):
+            if key in ('intensity', 'counts') or (
+                key == 'countTime' and data.shape[1] > 1
+            ):
                 output[key] = data * value[0].units
                 continue
             # if it is column vector, make it a row vector

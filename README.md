@@ -71,6 +71,15 @@ retains those partial metadata values. Partially missing geometric coordinates
 are rejected before classification; they cannot become shared angles. Completely
 absent optional axes remain optional.
 
+Declared signal units are decoded for XRDML, RASX `IntensityUnit`, and BRML
+recordings, including BRML unit prefixes. Readers return count-scale signals as
+dimensionless quantities and explicit rates in `count/s`, preserving their
+meaning without time normalization. The receiving normalizer can then choose a
+common representation; NOMAD Measurements converts explicit rates back to
+counts using the corresponding nominal integration times. Missing unit
+declarations retain the existing count-scale convention. Unknown declared units
+are rejected; mixed count/rate scans within one XRDML file are not combined.
+
 RASX profile coordinates follow `ScanInformation.AxisName`. A pure Omega profile
 produces `Omega`, while recorded fixed 2θ remains separate. `TwoTheta`,
 `TwoThetaOmega`, and `TwoThetaTheta` use a 2θ abscissa. Coordinates and units are
@@ -93,7 +102,7 @@ channels or interpret them as total duration or measured detector live time.
 
 | Format | Time source |
 | --- | --- |
-| XRDML | `commonCountingTime` |
+| XRDML | `commonCountingTime` or per-point `countingTimes` |
 | RASX STEP | `Speed` when `SpeedUnit` is a time unit |
 | RASX CONTINUOUS | Absolute `Step / Speed`, with compatible units |
 | BRML | `TimePerStepEffective`, interpreted in seconds |
@@ -102,6 +111,9 @@ channels or interpret them as total duration or measured detector live time.
 Missing, nonpositive, nonfinite, or incompatible optional times are omitted.
 If timing is incomplete across scans, omit the time array rather than assigning
 another scan's time. This metadata does not change intensity normalization.
+Per-point XRDML times retain a full RSM matrix, including identical rows, so
+their channel assignment remains explicit. Compact scan-wise times are not
+expanded into per-channel copies.
 The Rigaku mode distinction follows the
 [General Measurement manual, page 3](https://alexzevalkink.wordpress.com/wp-content/uploads/2017/04/meas_khp2_00068_eng.pdf#page=7).
 The BRML choice follows the use of effective time in
@@ -163,3 +175,48 @@ clone the repo:
 ```sh
 pre-commit install
 ```
+
+
+## Optional measurement metadata
+
+The four readers add `metadata["details"]` alongside their existing measurement
+arrays and core metadata. Each family contains records with `key`, `values` and
+`sources`. `key` identifies a reported component or repeated header; it is not a
+laboratory ID. `values` contains explicitly supported values, using Pint for
+physical quantities and integer arrays for Miller indices. `sources` maps each
+value name to its original XML paths or RAW4 tags. XML indexes are one-based;
+RASX/BRML paths include the ZIP member. Missing and blank text values are omitted.
+
+| Format | Additional metadata |
+| --- | --- |
+| XRDML | Authors, comments, acquisition software/version, control-software notes, detector description, sample name, monochromator and explicit crystal material/hkl, Soller opening, aperture size, mirror label and attenuator material |
+| RASX | Operator, GeneralInformation notes, sample name, selected detector, original optics labels, and a restricted set of fixed geometric axis positions with explicit compatible units |
+| BRML | Fixed drive positions in RawData order, mounted optics from both tracks, explicitly typed aperture/mirror/detector descriptions and the tube serial number |
+| RAW4 | USER, COMMENT, CREATOR and an explicitly supplied CREATOR_VERSION |
+
+Repeated equal headers are merged and retain all contributing source paths.
+Conflicting common values are omitted with a warning when a logger is supplied;
+no first-scan value is silently selected. Position arrays retain the original
+profile/RawData order. These configuration positions do not imply a time series
+or a commanded target and do not replace the measured scan coordinates.
+
+For example, inspect explicitly reported Soller openings:
+
+```python
+from fairmat_readers_xrd import read_panalytical_xrdml
+
+measurement = read_panalytical_xrdml("<measurement.xrdml>")
+for item in measurement["metadata"]["details"].get("collimators", []):
+    opening = item["values"].get("soller_angle")
+    if opening is not None:
+        print(opening.to("degree"), item["sources"]["soller_angle"])
+```
+
+No crystal material or reflection is decoded from product names. Reflection
+count is not diffraction order. Mirror acceptance angles, parallel-plate opening
+semantics, attenuator thresholds/transmission and RASX temperature readback versus
+setpoint are not inferred. Format versions are preserved as labelled notes,
+separately from acquisition-software versions. Invalid optional physical values
+are omitted with a warning; existing scientific array parsing is unchanged.
+The receiving application explicitly maps these records into its own data model;
+the readers do not import NOMAD or generated NeXus classes.
