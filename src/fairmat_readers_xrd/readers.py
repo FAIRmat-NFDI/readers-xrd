@@ -25,7 +25,7 @@ import pint
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
 from fairmat_readers_xrd.models import validate_output
-from fairmat_readers_xrd.metadata import (
+from fairmat_readers_xrd.metadata_extraction import (
     brml_metadata,
     rasx_metadata,
     raw_metadata,
