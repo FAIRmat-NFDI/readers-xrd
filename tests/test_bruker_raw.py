@@ -113,7 +113,7 @@ class TestBrukerRAW4Parser:
         header = parser.to_xy_format().splitlines()
         assert not any(line.startswith(('# Start:', '# Step:')) for line in header)
 
-    def test_missing_start_angle_does_not_crash(self, sample_raw_file, tmp_path):
+    def test_truncated_range_is_rejected(self, sample_raw_file, tmp_path):
         """A file too short to hold the start angle must not crash the parser."""
         # The start angle sits at byte 0x04FB. A file cut before it used to
         # crash with UnboundLocalError, because start_angle = None was set in
@@ -124,9 +124,8 @@ class TestBrukerRAW4Parser:
         truncated_file.write_bytes(truncated)
 
         parser = BrukerRAW4Parser(str(truncated_file))
-        parser.parse()
-        assert 'start_angle' not in parser.scan_params
-        assert parser.angles is None
+        with pytest.raises(ValueError, match='Truncated'):
+            parser.parse()
 
 
 class TestReadBrukerRaw:
@@ -186,7 +185,7 @@ class TestReadBrukerRaw:
         truncated_file = tmp_path / 'truncated.raw'
         truncated_file.write_bytes(truncated)
 
-        with pytest.raises(ValueError, match='2Theta scan cannot be built'):
+        with pytest.raises(ValueError, match='Truncated'):
             read_bruker_raw(str(truncated_file))
 
 
@@ -212,9 +211,11 @@ def test_raw_wavelengths_are_quantities():
     source = read_bruker_raw('tests/data/TwoTheta_scan_scrambled.raw')['metadata'][
         'source'
     ]
-    for key in ['kAlpha1', 'kAlpha2', 'kBeta']:
+    for key in ['kAlpha1', 'kBeta']:
         assert source[key].units == ureg.angstrom
-    assert source['kAlpha1'].magnitude == pytest.approx(1.540598)
+    assert source['kAlpha1'].magnitude == pytest.approx(1.5405999422073364)
+    assert source['kAlpha2'] is None
+    assert source['ratioKAlpha2KAlpha1'].magnitude == 0
     assert source['ratioKAlpha2KAlpha1'].units == ureg.dimensionless
 
 

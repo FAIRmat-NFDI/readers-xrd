@@ -12,10 +12,10 @@
     "scan_mode": "Locked Coupled",
     "source": {
       "anode_material": "Cu",
-      "kAlpha1": 1.5405999422073364,
+      "kAlpha1": "1.5405999422073364",
       "kAlpha2": null,
-      "kBeta": 1.3922200202941895,
-      "ratioKAlpha2KAlpha1": 0.0,
+      "kBeta": "1.3922200202941895",
+      "ratioKAlpha2KAlpha1": "0.0",
       "voltage": "40.0",
       "current": "40.0"
     }

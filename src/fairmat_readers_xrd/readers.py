@@ -17,20 +17,20 @@
 #
 import collections
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pint
 
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
-from fairmat_readers_xrd.models import validate_output
 from fairmat_readers_xrd.metadata_extraction import (
     brml_metadata,
     rasx_metadata,
     raw_metadata,
     xrdml_metadata,
 )
+from fairmat_readers_xrd.models import validate_output
 from fairmat_readers_xrd.timing import (
     complete_scan_times,
     counting_time,
@@ -383,7 +383,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
 
 
 @validate_output
-def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, Any]:
+def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
     """Read the validated single-range RAW4 powder geometry and native metadata."""
     parser = BrukerRAW4Parser(file_path)
     if logger is not None:
@@ -399,6 +399,14 @@ def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> Dict[str, A
         'voltage': meta['voltage'] * ureg.kilovolt,
         'current': meta['current'] * ureg.milliampere,
     }
+    for key, unit in (
+        ('kAlpha1', 'angstrom'),
+        ('kAlpha2', 'angstrom'),
+        ('kBeta', 'angstrom'),
+        ('ratioKAlpha2KAlpha1', 'dimensionless'),
+    ):
+        if source[key] is not None:
+            source[key] = source[key] * ureg(unit)
     return {
         '2Theta': np.asarray(parser.angles) * ureg.degree,
         'intensity': np.asarray(parser.intensities) * ureg.dimensionless,

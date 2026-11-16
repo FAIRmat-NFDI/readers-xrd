@@ -57,7 +57,9 @@ def test_raw4_uses_declared_sizes(tmp_path, record_size, extra_size):
     np.testing.assert_allclose(result['2Theta'].magnitude, 10 + np.arange(5) * 0.01)
     np.testing.assert_allclose(result['countTime'].to('s').magnitude, [0.25])
     assert result['metadata']['scan_axis'] == '2Theta'
-    assert result['metadata']['source']['kAlpha1'] == pytest.approx(1.541)
+    assert result['metadata']['source']['kAlpha1'].to(
+        'angstrom'
+    ).magnitude == pytest.approx(1.541)
     assert result['metadata']['source']['kAlpha2'] is None
     assert result['metadata']['source']['ratioKAlpha2KAlpha1'] == 0
     assert result['metadata']['source']['voltage'].to('V').magnitude == pytest.approx(

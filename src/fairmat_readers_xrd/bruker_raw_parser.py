@@ -96,7 +96,7 @@ class BrukerRAW4Parser:
             raise ValueError('Invalid RAW4 block length.')
         return kind, size
 
-    def parse(self) -> Dict[str, Any]:
+    def parse(self) -> dict[str, Any]:
         data = self.filepath.read_bytes()
         if not data.startswith(self.HEADER_MAGIC) or len(data) < _PREAMBLE:
             raise ValueError('Invalid or truncated RAW4 header.')

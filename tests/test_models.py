@@ -81,15 +81,14 @@ def test_intensity_and_two_theta_lengths_must_match():
     ],
 )
 def test_readers_validate_their_output(reader, path, monkeypatch):
-    original = readers.modify_scan_data
+    original = XRDOutput.model_validate
 
-    def drop_two_theta(scan_data, scan_type):
-        modified = original(scan_data, scan_type)
-        modified.pop('2Theta', None)
-        return modified
+    def remove_intensity(output):
+        incomplete = {k: v for k, v in output.items() if k != 'intensity'}
+        return original(incomplete)
 
-    monkeypatch.setattr(readers, 'modify_scan_data', drop_two_theta)
-    with pytest.raises(ValidationError, match='2Theta'):
+    monkeypatch.setattr(XRDOutput, 'model_validate', remove_intensity)
+    with pytest.raises(ValidationError, match='intensity'):
         reader(path)
 
 
@@ -109,3 +108,22 @@ def test_source_values_must_be_quantities(field):
     output['metadata'] = {'source': {field: 1.5}}
     with pytest.raises(ValidationError, match=field):
         XRDOutput.model_validate(output)
+
+
+def test_fixed_and_unreported_two_theta_in_omega_scan():
+    output = _minimal_output()
+    output['metadata'] = {'scan_axis': 'Omega'}
+    output['Omega'] = np.linspace(1, 5, 5) * ureg.degree
+    output['2Theta'] = np.array([44]) * ureg.degree
+    XRDOutput.model_validate(output)
+    del output['2Theta']
+    XRDOutput.model_validate(output)
+
+
+def test_optional_metadata_preserves_scan_boundaries_and_source_details():
+    output = _minimal_output()
+    output['metadata'] = {
+        'end_time': '2026-11-16T12:00:00+01:00',
+        'details': {'users': [{'key': 'user', 'values': {'name': 'Operator'}}]},
+    }
+    XRDOutput.model_validate(output)

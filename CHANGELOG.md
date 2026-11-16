@@ -17,6 +17,9 @@
 
 ### Fixed
 
+- Retain strict output validation with compact fixed angles, reported Omega scans
+  and optional provenance metadata; return RAW4 source values as quantities.
+
 - Respect RAW4 block lengths, record sizes and point counts; reject unsupported
   modes, multiple ranges and truncated input.
 - Preserve repeated spectra and single-point shapes. Follow per-profile RASX axes
