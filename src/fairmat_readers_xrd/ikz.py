@@ -416,25 +416,22 @@ class BRMLfile:
                 for axis in scanaxes:
                     aname = axis['@AxisName']
                     if aname in recorded_axes:
-                        self.data[aname].extend(
-                            [None] * (i + 1 - len(self.data[aname]))
-                        )
-                        self.data[aname][i] = recorded_axes[aname]
-                        continue
-                    aunit = axis['Unit']['@Base']
-                    aref = float(axis['Reference'])
-                    astart = float(axis['Start']) + aref
-                    astop = float(axis['Stop']) + aref
-                    astep = float(axis['Increment'])
-                    nint = int(round(abs(astop - astart) / astep))
-                    adata = {}  # not originally part of Carsten's code
-                    if nsteps == 1:
-                        # true for rsm scans tested so far
-                        adata['Value'] = np.linspace(astart, astop, nint)
-                    if nsteps > 1:
-                        # true for 1d scans tested so far
-                        adata['Value'] = np.linspace(astart, astop, nsteps)
-                    adata['Unit'] = aunit.lower()
+                        adata = recorded_axes[aname]
+                    else:
+                        aunit = axis['Unit']['@Base']
+                        aref = float(axis['Reference'])
+                        astart = float(axis['Start']) + aref
+                        astop = float(axis['Stop']) + aref
+                        astep = float(axis['Increment'])
+                        nint = int(round(abs(astop - astart) / astep))
+                        adata = {}  # not originally part of Carsten's code
+                        if nsteps == 1:
+                            # true for rsm scans tested so far
+                            adata['Value'] = np.linspace(astart, astop, nint)
+                        if nsteps > 1:
+                            # true for 1d scans tested so far
+                            adata['Value'] = np.linspace(astart, astop, nsteps)
+                        adata['Unit'] = aunit.lower()
                     self.data[aname].extend([None] * (i + 1 - len(self.data[aname])))
                     self.data[aname][i] = adata
 
@@ -483,10 +480,10 @@ class BRMLfile:
         if len(counter_key) > 1:
             raise ValueError('More than one intensity counters found.')
 
-        signal_units = getattr(self, 'signal_units', {}).get(counter_key[0], [])
+        signal_units = self.signal_units[counter_key[0]]
         for index, scan_intensity in enumerate(self.data[counter_key[0]]):
             reshaped_intensity = scan_intensity.reshape(-1)
-            units = signal_units[index] if index < len(signal_units) else {}
+            units = signal_units[index]
             output['intensity'].append(
                 intensity_quantity(
                     reshaped_intensity, units.get('@Base'), prefix=units.get('@Prefix')

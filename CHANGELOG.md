@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- Warn once when an XRDML measurement contains mixed scan axes.
 - Retain strict output validation with compact fixed angles, reported Omega scans
   and optional provenance metadata; return RAW4 source values as quantities.
 

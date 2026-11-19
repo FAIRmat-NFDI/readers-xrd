@@ -42,6 +42,7 @@ from fairmat_readers_xrd.utils import (
     detect_scan_type,
     intensity_quantity,
     modify_scan_data,
+    to_pint_quantity,
 )
 
 if TYPE_CHECKING:
@@ -215,14 +216,14 @@ def read_panalytical_xrdml(
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
 
+    scan_axis = _common_scan_value((s.get('scanAxis') for s in scans), 'axis', logger)
+
     return {
         **modified_scan_data,
         'countTime': modified_scan_data.get('countTime'),
-        'scanmotname': _common_scan_value(
-            (s.get('scanAxis') for s in scans), 'axis', logger
-        ),
+        'scanmotname': scan_axis,
         'metadata': {
-            'details': xrdml_metadata(root, ns, logger),
+            'details': xrdml_metadata(root, xrd_measurement, scans, ns, logger),
             'sample_id': find_string('xrdml:sample/xrdml:id'),
             'measurement_type': xrd_measurement.get('measurementType', None),
             'sample_mode': xrd_measurement.get('sampleMode', None),
@@ -265,9 +266,7 @@ def read_panalytical_xrdml(
             'scan_mode': _common_scan_value(
                 (s.get('mode') for s in scans), 'mode', logger
             ),
-            'scan_axis': _common_scan_value(
-                (s.get('scanAxis') for s in scans), 'axis', logger
-            ),
+            'scan_axis': scan_axis,
             'scan_type': scan_type,
         },
     }
@@ -384,7 +383,7 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
 
 @validate_output
 def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
-    """Read the validated single-range RAW4 powder geometry and native metadata."""
+    """Read one Locked Coupled RAW4 scan."""
     parser = BrukerRAW4Parser(file_path)
     if logger is not None:
         parser.logger = logger
@@ -392,21 +391,15 @@ def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, A
     meta, params = raw['metadata'], raw['scan_params']
     source = {
         'anode_material': meta.get('anode_material'),
-        'kAlpha1': meta.get('wavelength_kalpha1'),
-        'kAlpha2': meta.get('wavelength_kalpha2'),
-        'kBeta': meta.get('wavelength_kbeta'),
-        'ratioKAlpha2KAlpha1': meta.get('kalpha2_kalpha1_ratio'),
+        'kAlpha1': to_pint_quantity(meta.get('wavelength_kalpha1'), 'angstrom'),
+        'kAlpha2': to_pint_quantity(meta.get('wavelength_kalpha2'), 'angstrom'),
+        'kBeta': to_pint_quantity(meta.get('wavelength_kbeta'), 'angstrom'),
+        'ratioKAlpha2KAlpha1': to_pint_quantity(
+            meta.get('kalpha2_kalpha1_ratio'), 'dimensionless'
+        ),
         'voltage': meta['voltage'] * ureg.kilovolt,
         'current': meta['current'] * ureg.milliampere,
     }
-    for key, unit in (
-        ('kAlpha1', 'angstrom'),
-        ('kAlpha2', 'angstrom'),
-        ('kBeta', 'angstrom'),
-        ('ratioKAlpha2KAlpha1', 'dimensionless'),
-    ):
-        if source[key] is not None:
-            source[key] = source[key] * ureg(unit)
     return {
         '2Theta': np.asarray(parser.angles) * ureg.degree,
         'intensity': np.asarray(parser.intensities) * ureg.dimensionless,

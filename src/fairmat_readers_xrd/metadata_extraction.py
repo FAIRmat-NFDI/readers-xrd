@@ -107,9 +107,7 @@ def _quantity(text, unit, path, logger, category=None):
         return None
 
 
-def xrdml_metadata(root, ns, logger=None):
-    measurement = root.find('xrdml:xrdMeasurement', ns)
-    scans = measurement.findall('xrdml:scan', ns)
+def xrdml_metadata(root, measurement, scans, ns, logger=None):
     details = {
         'users': [],
         'notes': [],
@@ -248,17 +246,23 @@ def xrdml_metadata(root, ns, logger=None):
                                 )
                     family = 'monochromators'
                 elif tag == 'sollerSlit' or tag in aperture_tags:
-                    child_name = (
-                        'opening' if tag == 'sollerSlit' else aperture_tags[tag]
-                    )
+                    if tag == 'sollerSlit':
+                        child_name = 'opening'
+                        field = 'soller_angle'
+                        unit = 'radian'
+                        family = 'collimators'
+                    else:
+                        child_name = aperture_tags[tag]
+                        field = 'size'
+                        unit = 'meter'
+                        family = 'apertures'
                     child = node.find(f'xrdml:{child_name}', ns)
-                    field = 'soller_angle' if tag == 'sollerSlit' else 'size'
                     values[field] = _quantity(
                         child.text if child is not None else None,
                         child.get('unit') if child is not None else None,
                         f'{base}/{child_name}',
                         logger,
-                        'radian' if tag == 'sollerSlit' else 'meter',
+                        unit,
                     )
                     sources[field] = f'{base}/{child_name}'
                     values['description'] = (
@@ -266,7 +270,6 @@ def xrdml_metadata(root, ns, logger=None):
                         f'{child_name} is the supplied opening dimension.'
                     )
                     sources['description'] = base
-                    family = 'collimators' if tag == 'sollerSlit' else 'apertures'
                 elif tag == 'beamAttenuator':
                     values['material'] = _text(
                         node.findtext('xrdml:material', namespaces=ns)

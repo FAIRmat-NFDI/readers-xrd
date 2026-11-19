@@ -128,27 +128,20 @@ class BrukerRAW4Parser:
         )
 
     def _read_source(self, block):
-        names = (
-            'wavelength_kalpha_avg',
-            'wavelength_kalpha1',
-            'wavelength_kalpha2',
-            'wavelength_kbeta',
-            'kalpha2_kalpha1_ratio',
+        fields = (
+            ('wavelength_kalpha_avg', 'K_alpha_avg'),
+            ('wavelength_kalpha1', 'K_alpha1'),
+            ('wavelength_kalpha2', 'K_alpha2'),
+            ('wavelength_kbeta', 'K_beta'),
+            ('kalpha2_kalpha1_ratio', 'K_alpha2_K_alpha1_ratio'),
         )
         material = self._text(block[116:120])
         self.metadata['anode_material'] = material or None
         fallback = XRAY_WAVELENGTHS.get(material, {})
-        fallback_names = (
-            'K_alpha_avg',
-            'K_alpha1',
-            'K_alpha2',
-            'K_beta',
-            'K_alpha2_K_alpha1_ratio',
-        )
-        for key, original_value, fallback_key in zip(
-            names, struct.unpack_from('<5d', block, 72), fallback_names
+        for (key, fallback_key), raw_value in zip(
+            fields, struct.unpack_from('<5d', block, 72)
         ):
-            value = original_value
+            value = raw_value
             # Zero wavelengths are unreported; a zero intensity ratio is valid.
             if not np.isfinite(value) or value < 0:
                 self.logger.warning(f'Ignoring invalid RAW4 source value {key}.')
