@@ -25,6 +25,31 @@ ureg = pint.get_application_registry()
 MAX_SUPPORTED_INTENSITY_DIMENSIONS = 2
 
 
+def intensity_quantity(values, unit=None, *, prefix=None):
+    """Decode counts or an explicit count rate without normalizing by time."""
+    aliases = {
+        'counts': 'count',
+        'cts': 'count',
+        'cps': 'count/s',
+        'countspersecond': 'count/s',
+        'countpersecond': 'count/s',
+        'counts/s': 'count/s',
+        'cts/s': 'count/s',
+    }
+    unit = aliases.get(str(unit).casefold().replace(' ', ''), unit)
+    try:
+        signal = np.asarray(values, dtype=float) * ureg(unit or 'dimensionless')
+        if prefix and prefix.casefold() != 'none':
+            signal *= ureg(prefix.lower() + 'count').to('count').magnitude
+        if signal.is_compatible_with('dimensionless'):
+            return signal.to('dimensionless')
+        if signal.is_compatible_with('count/s'):
+            return signal.to('count/s')
+    except pint.errors.PintError as error:
+        raise ValueError(f'Invalid XRD signal unit: {unit!r}.') from error
+    raise ValueError(f'Unsupported XRD signal unit: {unit!r}.')
+
+
 def to_pint_quantity(value: Any = None, unit: str = None) -> Any:
     """
     Attempts to generate a pint quantity.
@@ -59,12 +84,16 @@ def are_all_identical(arr_list):
         bool: True if all the arrays are identical, False otherwise.
     """
     first_arr = arr_list[0]
+    unit = getattr(first_arr, 'units', None)
     if isinstance(first_arr, ureg.Quantity):
         first_arr = first_arr.magnitude
 
     for arr in arr_list[1:]:
-        arr_magnitude = arr.magnitude if isinstance(arr, ureg.Quantity) else arr
-        if not np.array_equal(first_arr, arr_magnitude):
+        arr_magnitude = arr.to(unit).magnitude if unit is not None else arr
+        # Permit only floating-point unit-conversion roundoff.
+        if np.shape(first_arr) != np.shape(arr_magnitude) or not np.allclose(
+            first_arr, arr_magnitude, rtol=8 * np.finfo(float).eps, atol=0
+        ):
             return False
     return True
 
@@ -83,27 +112,41 @@ def detect_scan_type(scan_data):
     Returns:
         str: The type of scan.
     """
-    if len(scan_data['intensity']) == 1:
-        return 'line'
-
+    count = len(scan_data['intensity'])
+    if not count:
+        raise ValueError('XRD scan contains no intensity data.')
     # if intensity data is not a regular 2D array, it is not `rsm`
     for scan_intensity in scan_data['intensity'][1:]:
         if scan_intensity.shape != scan_data['intensity'][0].shape:
             return 'multiline'
 
-    intensity_data = np.array(scan_data['intensity']).squeeze()
-    if intensity_data.ndim > MAX_SUPPORTED_INTENSITY_DIMENSIONS:
+    for key in ('2Theta', 'Omega', 'Chi', 'Phi', 'Theta', 'X', 'Y', 'Z'):
+        values = scan_data.get(key)
+        if values is not None and (
+            len(values) != count or any(value is None for value in values)
+        ):
+            raise ValueError(
+                f'Incomplete XRD axis {key}; positions cannot be assigned to scans.'
+            )
+    if len(scan_data['intensity']) == 1:
+        return 'line'
+
+    intensity_shape = (
+        len(scan_data['intensity']),
+        *scan_data['intensity'][0].shape,
+    )
+    if len(intensity_shape) > MAX_SUPPORTED_INTENSITY_DIMENSIONS:
         raise AssertionError(
             'Scan type not detected. `intensity.ndim` must be 1 or 2. '
-            f'Found: {intensity_data.ndim}'
+            f'Found: {len(intensity_shape)}'
         )
 
-    if not are_all_identical(scan_data['2Theta']):
+    if scan_data.get('2Theta') is None or not are_all_identical(scan_data['2Theta']):
         return 'multiline'
     # find axis that updates from one scan to other
     var_axis = []
     for key in ['Omega', 'Chi', 'Phi', 'Theta']:
-        if key not in scan_data:
+        if scan_data.get(key) is None:
             continue
         data = scan_data[key]
         if not are_all_identical(data):
@@ -111,11 +154,12 @@ def detect_scan_type(scan_data):
     # if only one var_axis
     # and dimensions of 2theta, var_axis, and intensity are consistent, it is a rsm
     if len(var_axis) == 1:
-        two_theta = np.array(scan_data['2Theta'])
-        var_axis_data = np.array(scan_data[var_axis[0]])
+        two_theta_shape = (len(scan_data['2Theta']), *scan_data['2Theta'][0].shape)
+        var_axis_data = scan_data[var_axis[0]]
         if (
-            intensity_data.shape == two_theta.shape
-            and intensity_data.shape[0] == np.unique(var_axis_data).shape[0]
+            intensity_shape == two_theta_shape
+            and len(var_axis_data) == intensity_shape[0]
+            and all(np.all(row == row[0]) for row in var_axis_data)
         ):
             return 'rsm'
     return 'multiline'
@@ -127,13 +171,9 @@ def modify_scan_data(scan_data: dict, scan_type: str):
 
     If the scan type is `line`, the data is converted to 1D arrays.
 
-    If the scan type is `rsm`, data is converted into 2D arrays. Reduction of dimensions
-    is performed wherever possible. Matrix of shape (1,n) is converted to a 1D array of
-    length `n`. Further, if the vector contains identical elements, it is
-    reduced to a point vector of size 1. In case the rows of the 2D array are
-    identical, it is reduced to a 1D array containing the first row. Similar
-    to before, if the elements of this row are identical, it is reduced to a
-    point vector of size 1.
+    Intensity and counts retain every scan and point, including constant spectra.
+    For RSM, signal arrays are two-dimensional. Shared coordinates and optional
+    metadata may be reduced to vectors or a single value, in consistent units.
 
     If the scan type is `multiline`, the data is converted into a list of 1D arrays.
     Currently not implemented.
@@ -156,7 +196,9 @@ def modify_scan_data(scan_data: dict, scan_type: str):
             if value is None:
                 continue
             data = value[0].magnitude
-            if np.all(np.diff(data, axis=0) == 0):
+            if key not in ('intensity', 'counts') and np.all(
+                np.diff(data, axis=0) == 0
+            ):
                 # if elements are identical, pick the first one
                 data = np.array([data[0]])
             output[key] = data * value[0].units
@@ -169,12 +211,19 @@ def modify_scan_data(scan_data: dict, scan_type: str):
         for key, value in scan_data.items():
             if value is None:
                 continue
-            data = np.array(value)
+            data = np.array([item.to(value[0].units).magnitude for item in value])
+            if key in ('intensity', 'counts') or (
+                key == 'countTime' and data.shape[1] > 1
+            ):
+                output[key] = data * value[0].units
+                continue
             # if it is column vector, make it a row vector
-            if data.shape[1] == 1:
-                data = data.reshape(-1)
+            if data.shape[1] == 1 or (
+                key in ('Omega', 'Chi', 'Phi', 'Theta') and np.all(data == data[:, :1])
+            ):
+                data = data[:, 0]
             # if rows (or elements of a row) are identical, pick the first one
-            if np.all(np.diff(data, axis=0) == 0):
+            if are_all_identical(data):
                 data = data[0].reshape(-1)
             output[key] = data * value[0].units
         return output

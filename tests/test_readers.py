@@ -59,6 +59,8 @@ def test_rasx_reader():
     ]
     for path in file_path:
         output = read_rigaku_rasx(path)
+        # Optional metadata has dedicated value/provenance tests.
+        assert output['metadata'].pop('details') is not None
         convert_quantity_to_string(output)
         with open(f'{path}.json', encoding='utf-8') as f:
             reference = json.load(f)
@@ -73,6 +75,8 @@ def test_xrdml_reader():
     ]
     for path in file_path:
         output = read_panalytical_xrdml(path)
+        # Optional metadata has dedicated value/provenance tests.
+        assert output['metadata'].pop('details') is not None
         convert_quantity_to_string(output)
         with open(f'{path}.json', encoding='utf-8') as f:
             reference = json.load(f)
@@ -86,6 +90,8 @@ def test_brml_reader():
     ]
     for path in file_path:
         output = read_bruker_brml(path)
+        # Optional metadata has dedicated value/provenance tests.
+        assert output['metadata'].pop('details') is not None
         convert_quantity_to_string(output)
         with open(f'{path}.json', encoding='utf-8') as f:
             reference = json.load(f)
@@ -95,6 +101,7 @@ def test_brml_reader():
 def test_bruker_raw_reader():
     file_path = 'tests/data/TwoTheta_scan_scrambled.raw'
     output = read_bruker_raw(file_path)
+    assert output['metadata'].pop('details') is not None
     convert_quantity_to_string(output)
     with open(f'{file_path}.json', encoding='utf-8') as f:
         reference = json.load(f)

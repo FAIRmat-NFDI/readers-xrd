@@ -27,6 +27,7 @@
         },
         "scan_mode": "Continuous",
         "scan_axis": "2Theta",
-        "scan_type": "rsm"
+        "scan_type": "rsm",
+        "end_time": "2020-08-05T08:45:22+02:00"
     }
 }

@@ -24,12 +24,25 @@ import pint
 
 from fairmat_readers_xrd.bruker_raw_parser import BrukerRAW4Parser
 from fairmat_readers_xrd.ikz import BRMLfile, RASXfile
+from fairmat_readers_xrd.metadata_extraction import (
+    brml_metadata,
+    rasx_metadata,
+    raw_metadata,
+    xrdml_metadata,
+)
 from fairmat_readers_xrd.models import validate_output
+from fairmat_readers_xrd.timing import (
+    complete_scan_times,
+    counting_time,
+    rasx_counting_time,
+)
 
 # from pynxtools.dataconverter.convert import transfer_data_into_template
 from fairmat_readers_xrd.utils import (
     detect_scan_type,
+    intensity_quantity,
     modify_scan_data,
+    to_pint_quantity,
 )
 
 if TYPE_CHECKING:
@@ -63,6 +76,15 @@ def read_file(file_path: str) -> dict:
     if file_path.endswith('.raw'):
         return read_bruker_raw(file_path)
     raise NotImplementedError('Unknown file type.')
+
+
+def _common_scan_value(values, field, logger):
+    values = set(values)
+    if len(values) == 1:
+        return values.pop()
+    if logger is not None and values:
+        logger.warning(f'Mixed scan {field}; omitting common metadata.')
+    return None
 
 
 @validate_output
@@ -109,14 +131,18 @@ def read_panalytical_xrdml(
     intensities_array = []
     counts_array = []
 
-    for scan in scans:
+    for scan_index, scan in enumerate(scans):
         data_points = scan.find('xrdml:dataPoints', ns)
         intensities = data_points.find('xrdml:intensities', ns)
-        counting_time = data_points.find('xrdml:commonCountingTime', ns)
+        time_element = data_points.find('xrdml:commonCountingTime', ns)
+        if time_element is None:
+            time_element = data_points.find('xrdml:countingTimes', ns)
         attenuation = data_points.find('xrdml:beamAttenuationFactors', ns)
 
         counting_time_value.append(
-            np.fromstring(counting_time.text, sep=' ') * ureg(counting_time.get('unit'))
+            counting_time(time_element.text, time_element.get('unit'), logger)
+            if time_element is not None
+            else None
         )
         if attenuation is not None:
             attenuation_values.append(
@@ -124,18 +150,24 @@ def read_panalytical_xrdml(
             )
             scaling_factor = attenuation_values[-1]
         else:
-            attenuation_values = None
+            attenuation_values.append(None)
             scaling_factor = 1
         if intensities is not None:
             intensities_array.append(
-                np.fromstring(intensities.text, sep=' ') * ureg.dimensionless
+                intensity_quantity(
+                    np.fromstring(intensities.text, sep=' '), intensities.get('unit')
+                )
             )
-            counts_array = None
+            counts_array.append(None)
         else:
             counts = data_points.find('xrdml:counts', ns)
             counts_array.append(
-                np.fromstring(counts.text, sep=' ') * ureg.dimensionless
+                intensity_quantity(
+                    np.fromstring(counts.text, sep=' '), counts.get('unit')
+                )
             )
+            if not counts_array[-1].is_compatible_with('dimensionless'):
+                raise ValueError('XRDML counts must have count units, not rate units.')
             intensities_array.append(
                 counts_array[-1] * scaling_factor * ureg.dimensionless
             )
@@ -143,39 +175,55 @@ def read_panalytical_xrdml(
 
         for axis in data_points.findall('xrdml:positions', ns):
             name = axis.get('axis')
+            if name not in axes:
+                axes[name] = [None] * len(scans)
             unit = axis.get('unit')
             listed = axis.find('xrdml:listPositions', ns)
             start = axis.find('xrdml:startPosition', ns)
             end = axis.find('xrdml:endPosition', ns)
             common = axis.find('xrdml:commonPosition', ns)
             if listed is not None:
-                axes[name].append(np.fromstring(listed.text, sep=' ') * ureg(unit))
-            elif start is not None and end is not None:
-                axes[name].append(
-                    np.linspace(float(start.text), float(end.text), n_points)
-                    * ureg(unit)
+                axes[name][scan_index] = np.fromstring(listed.text, sep=' ') * ureg(
+                    unit
                 )
+            elif start is not None and end is not None:
+                axes[name][scan_index] = np.linspace(
+                    float(start.text), float(end.text), n_points
+                ) * ureg(unit)
             elif common is not None:
-                axes[name].append(np.array([float(common.text)]) * ureg(unit))
-            else:
-                if logger is not None:
-                    logger.warning('Unknown data for {name} axis.')
-                axes[name].append(None)
+                axes[name][scan_index] = np.array([float(common.text)]) * ureg(unit)
+            elif logger is not None:
+                logger.warning(f'Unknown data for {name} axis.')
 
     scan_data = collections.defaultdict(list)
     scan_data.update(axes)
+    if any(
+        not signal.is_compatible_with(intensities_array[0])
+        for signal in intensities_array[1:]
+    ):
+        raise ValueError('Mixed counts and count-rate scans are not supported.')
     scan_data['intensity'] = intensities_array
-    scan_data['counts'] = counts_array
-    scan_data['countTime'] = counting_time_value
-    scan_data['beamAttenuationFactors'] = attenuation_values
+    scan_data['counts'] = (
+        counts_array if all(value is not None for value in counts_array) else None
+    )
+    scan_data['countTime'] = complete_scan_times(counting_time_value, logger)
+    scan_data['beamAttenuationFactors'] = (
+        attenuation_values
+        if all(value is not None for value in attenuation_values)
+        else None
+    )
 
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
 
+    scan_axis = _common_scan_value((s.get('scanAxis') for s in scans), 'axis', logger)
+
     return {
         **modified_scan_data,
-        'scanmotname': scan.get('scanAxis', None),
+        'countTime': modified_scan_data.get('countTime'),
+        'scanmotname': scan_axis,
         'metadata': {
+            'details': xrdml_metadata(root, xrd_measurement, scans, ns, logger),
             'sample_id': find_string('xrdml:sample/xrdml:id'),
             'measurement_type': xrd_measurement.get('measurementType', None),
             'sample_mode': xrd_measurement.get('sampleMode', None),
@@ -183,8 +231,11 @@ def read_panalytical_xrdml(
                 'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:source'
                 '/xrdml:instrumentID'
             ),
-            'start_time': find_string(
-                'xrdml:xrdMeasurement/xrdml:scan/xrdml:header/xrdml:startTimeStamp'
+            'start_time': scans[0].findtext(
+                'xrdml:header/xrdml:startTimeStamp', namespaces=ns
+            ),
+            'end_time': scans[-1].findtext(
+                'xrdml:header/xrdml:endTimeStamp', namespaces=ns
             ),
             'source': {
                 'current': find_float(
@@ -212,8 +263,10 @@ def read_panalytical_xrdml(
                     '/xrdml:anodeMaterial'
                 ),
             },
-            'scan_mode': scan.get('mode', None),
-            'scan_axis': scan.get('scanAxis', None),
+            'scan_mode': _common_scan_value(
+                (s.get('mode') for s in scans), 'mode', logger
+            ),
+            'scan_axis': scan_axis,
             'scan_type': scan_type,
         },
     }
@@ -233,41 +286,41 @@ def read_rigaku_rasx(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
         Dict[str, Any]: The X-ray diffraction data in a Python dictionary.
     """
     reader = RASXfile(file_path, verbose=False)
-    scan_info = reader.get_scan_info()
     scan_data = reader.get_scan_data(logger)
     source = reader.get_source_info()
 
+    scan_infos = [
+        meta.get('ScanInformation', {}) for meta in reader.meta[: len(reader.data)]
+    ]
+    scan_data['countTime'] = complete_scan_times(
+        [rasx_counting_time(info, logger) for info in scan_infos], logger
+    )
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
-
-    count_time = None
-    scan_axis = None
-
-    if scan_info:
-        required_keys = ['Mode', 'SpeedUnit', 'PositionUnit', 'Step', 'Speed']
-        if all(key in scan_info and scan_info[key] for key in required_keys):
-            if scan_info['Mode'].lower() == 'continuous':
-                speed_unit = ureg(scan_info['SpeedUnit'].replace('min', 'minute'))
-                count_time_unit = ureg(scan_info['PositionUnit']) / speed_unit
-                count_time = (
-                    np.array([scan_info['Step'] / scan_info['Speed']]) * count_time_unit
-                )
-        scan_axis = scan_info.get('AxisName', None)
+    scan_axis = _common_scan_value(
+        (s.get('AxisName') for s in scan_infos), 'axis', logger
+    )
 
     return {
         **modified_scan_data,
-        'countTime': count_time,
+        'countTime': modified_scan_data.get('countTime'),
         'metadata': {
+            'details': rasx_metadata(reader, logger),
             'sample_id': None,
             'scan_axis': scan_axis,
             'scan_type': scan_type,
+            'scan_mode': _common_scan_value(
+                (s.get('Mode') for s in scan_infos), 'mode', logger
+            ),
+            'start_time': scan_infos[0].get('StartTime') if scan_infos else None,
+            'end_time': scan_infos[-1].get('EndTime') if scan_infos else None,
             'source': {
-                'anode_material': source['TargetName'],
-                'kAlpha1': source['WavelengthKalpha1'],
-                'kAlpha2': source['WavelengthKalpha2'],
-                'kBeta': source['WavelengthKbeta'],
-                'voltage': source['Voltage'],
-                'current': source['Current'],
+                'anode_material': source.get('TargetName'),
+                'kAlpha1': source.get('WavelengthKalpha1'),
+                'kAlpha2': source.get('WavelengthKalpha2'),
+                'kBeta': source.get('WavelengthKbeta'),
+                'voltage': source.get('Voltage'),
+                'current': source.get('Current'),
                 'ratioKAlpha2KAlpha1': None,
             },
         },
@@ -291,6 +344,13 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
     scan_info = reader.get_scan_info()
     source = reader.get_source_info()
     scan_data = reader.get_scan_data(logger)
+    scan_data['countTime'] = complete_scan_times(
+        [
+            counting_time(value, 's', logger)
+            for value in reader.data['TimePerStepEffective']
+        ],
+        logger,
+    )
     scan_type = detect_scan_type(scan_data)
     modified_scan_data = modify_scan_data(scan_data, scan_type)
     modified_scan_data['Omega'] = modified_scan_data.pop(
@@ -299,19 +359,23 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
 
     return {
         **modified_scan_data,
-        'countTime': None,
+        'countTime': modified_scan_data.get('countTime'),
         'metadata': {
+            'details': brml_metadata(reader, logger),
             'sample_id': None,
-            'scan_axis': scan_info.get('ScanName', None),
+            'scan_axis': _common_scan_value(reader.data['ScanName'], 'axis', logger),
             'scan_type': scan_type,
+            'scan_mode': _common_scan_value(reader.data['ScanMode'], 'mode', logger),
+            'start_time': scan_info.get('start_time'),
+            'end_time': scan_info.get('end_time'),
             'source': {
-                'anode_material': source['TubeMaterial'],
-                'kAlpha1': source['WaveLengthAlpha1'],
-                'kAlpha2': source['WaveLengthAlpha2'],
-                'kBeta': source['WaveLengthBeta'],
-                'ratioKAlpha2KAlpha1': source['WaveLengthRatio'],
-                'voltage': source['Voltage'],
-                'current': source['Current'],
+                'anode_material': source.get('TubeMaterial'),
+                'kAlpha1': source.get('WaveLengthAlpha1'),
+                'kAlpha2': source.get('WaveLengthAlpha2'),
+                'kBeta': source.get('WaveLengthBeta'),
+                'ratioKAlpha2KAlpha1': source.get('WaveLengthRatio'),
+                'voltage': source.get('Voltage'),
+                'current': source.get('Current'),
             },
         },
     }
@@ -319,125 +383,36 @@ def read_bruker_brml(file_path: str, logger: 'BoundLogger' = None) -> dict[str, 
 
 @validate_output
 def read_bruker_raw(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
-    """
-    Read Bruker/Siemens RAW v4 binary files using native Python parser.
-
-    This function parses Bruker RAW v4 (magic header "RAW4.00") binary files directly
-    without requiring external conversion tools. All scan parameters (start_angle,
-    step_size, num_points, scan_axis) are extracted directly from the binary file.
-
-    Args:
-        file_path (str): Path to the Bruker .raw file.
-        logger (BoundLogger, optional): Logger instance for warnings/errors.
-
-    Returns:
-        Dict[str, Any]: XRD data dictionary compatible with nomad-measurements
-                        schema.
-
-    Raises:
-        ValueError: If the 2Theta scan cannot be built (missing start angle,
-            step size, number of points or intensities).
-
-    Note:
-        - Only RAW v4 format is currently supported
-        - Designed for single-axis theta-2theta powder diffraction scans
-        - Multi-axis scans (texture, pole figures) may not parse correctly
-        - All scan parameters are extracted from the binary file
-        - No external files (.xrdml) are required
-
-    Citation for RAW format understanding:
-        Siemens/Bruker RAW format is proprietary but reverse-engineered
-        for open science data management. Based on DIFFRAC.EVA output files.
-    """
-    try:
-        # Parse the RAW file - all parameters are extracted from the file
-        parser = BrukerRAW4Parser(file_path)
-        raw_data = parser.parse()
-        if not parser.angles or not parser.intensities:
-            raise ValueError(
-                'start angle, step size, number of points or intensities '
-                'are missing, so the 2Theta scan cannot be built'
-            )
-        # Prepare scan data in the format expected by detect_scan_type/modify_scan_data
-        # (list of arrays, like XRDML parser does)
-        scan_data = {
-            '2Theta': [np.array(parser.angles) * ureg.degree],
-            'intensity': [np.array(parser.intensities) * ureg.dimensionless],
-            'counts': None,
-            'countTime': None,
-            'beamAttenuationFactors': None,
-        }
-
-        # Detect scan type and modify data accordingly (like other readers)
-        scan_type = detect_scan_type(scan_data)
-        modified_scan_data = modify_scan_data(scan_data, scan_type)
-
-        # Build metadata dictionary
-        # Extract scan axis from raw data (e.g., "Theta")
-        scan_axis = raw_data['scan_params'].get('scan_axis', '')
-
-        # Build source metadata if anode material was found
-        source_metadata = {}
-        if 'anode_material' in raw_data['metadata']:
-            raw_metadata = raw_data['metadata']
-
-            # The RAW file does not store wavelengths or their unit. The parser takes
-            # them from its XRAY_WAVELENGTHS table (bruker_raw_parser.py), which is
-            # given in angstrom.
-
-            def to_quantity(key, unit):
-                value = raw_metadata.get(key)
-                return None if value is None else value * ureg(unit)
-
-            source_metadata = {
-                'anode_material': raw_metadata['anode_material'],
-                'kAlpha1': to_quantity('wavelength_kalpha1', 'angstrom'),
-                'kAlpha2': to_quantity('wavelength_kalpha2', 'angstrom'),
-                'kBeta': to_quantity('wavelength_kbeta', 'angstrom'),
-                'ratioKAlpha2KAlpha1': to_quantity(
-                    'kalpha2_kalpha1_ratio', 'dimensionless'
-                ),
-            }
-        metadata = {
-            'sample_id': raw_data['metadata'].get('sample_id'),
-            'scan_type': scan_type,
-            'scan_axis': scan_axis,  # Extracted from RAW file at offset 0x04D0
-            'source': source_metadata,  # Anode material and wavelengths from lookup
-            # table
-        }
-
-        # Return data in the same format as read_panalytical_xrdml
-        # Use scan_axis as scanmotname (e.g., "Theta")
-        return {
-            **modified_scan_data,
-            'scanmotname': scan_axis,  # Extracted from RAW file at offset 0x04D0
-            'metadata': metadata,
-        }
-
-    except Exception as e:
-        if logger:
-            logger.error(
-                f'Failed to parse Bruker/Siemens .raw file {file_path}: {str(e)}. '
-                f'The file may be corrupted or in an unsupported format.'
-            )
-        raise
-
-
-def read_nexus_xrd(file_path: str, logger: 'BoundLogger' = None) -> dict[str, Any]:
-    """
-    Function for reading the X-ray diffraction data in a Nexus file.
-
-    Args:
-        file_path (str): The path to the X-ray diffraction data file.
-        logger (BoundLogger, optional): A structlog logger. Defaults to None.
-
-    Returns:
-        Dict[str, Any]: The X-ray diffraction data in a Python dictionary.
-    """
-    nxdl_name = 'NXxrd_pan'
-    xrd_template = transfer_data_into_template(
-        nxdl_name=nxdl_name,
-        input_file=file_path,
-        reader='xrd',
-    )
-    return xrd_template
+    """Read one Locked Coupled RAW4 scan."""
+    parser = BrukerRAW4Parser(file_path)
+    if logger is not None:
+        parser.logger = logger
+    raw = parser.parse()
+    meta, params = raw['metadata'], raw['scan_params']
+    source = {
+        'anode_material': meta.get('anode_material'),
+        'kAlpha1': to_pint_quantity(meta.get('wavelength_kalpha1'), 'angstrom'),
+        'kAlpha2': to_pint_quantity(meta.get('wavelength_kalpha2'), 'angstrom'),
+        'kBeta': to_pint_quantity(meta.get('wavelength_kbeta'), 'angstrom'),
+        'ratioKAlpha2KAlpha1': to_pint_quantity(
+            meta.get('kalpha2_kalpha1_ratio'), 'dimensionless'
+        ),
+        'voltage': meta['voltage'] * ureg.kilovolt,
+        'current': meta['current'] * ureg.milliampere,
+    }
+    return {
+        '2Theta': np.asarray(parser.angles) * ureg.degree,
+        'intensity': np.asarray(parser.intensities) * ureg.dimensionless,
+        'counts': None,
+        'countTime': counting_time(params.get('counting_time_ms'), 'ms', logger),
+        'beamAttenuationFactors': None,
+        'scanmotname': params['scan_axis'],
+        'metadata': dict(
+            details=raw_metadata(meta),
+            sample_id=meta.get('sample_id'),
+            scan_type='line',
+            scan_axis=params['scan_axis'],
+            scan_mode=params['scan_mode'],
+            source=source,
+        ),
+    }

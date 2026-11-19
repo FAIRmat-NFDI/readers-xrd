@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         BoundLogger,
     )
 
-from fairmat_readers_xrd.utils import to_pint_quantity
+from fairmat_readers_xrd.utils import intensity_quantity, to_pint_quantity
 
 
 def try_scalar(val):
@@ -58,6 +58,9 @@ def parse_rasx_metadata(xml):
     for category in hwconf.find('Categories'):
         optics[category.attrib['Name']] = category.attrib['SelectedUnit']
     optics['Monochromator'] = [child.text for child in hwconf.find('Optics')]
+    hwdict['optics_settings'] = {
+        child.tag: child.text for child in hwconf.find('Optics')
+    }
     hwdict['Detector'] = optics['Detector']
 
     distances = hwdict['distances'] = []
@@ -141,6 +144,7 @@ class RASXfile:
             numscans = len(profiles)
             data = []
             meta = []
+            self.metadata_paths = []
             for i in range(numscans):
                 if verbose:
                     if not i:
@@ -153,12 +157,13 @@ class RASXfile:
                 with fh.open(profile) as f:
                     ## python >= 3.7:
                     f.seek(3)  # skip the 3 non-ascii symbols at the start
-                    data.append(np.loadtxt(f))
+                    data.append(np.loadtxt(f, ndmin=2))
                     ## the ugly way to stay python < 3.7 compatible:
                     # _content = BytesIO(f.read()[3:])
                     # data.append(np.loadtxt(_content))
                 with fh.open(metafile) as xml:
                     meta.append(parse_rasx_metadata(xml))
+                    self.metadata_paths.append(metafile)
 
             ## loading images if available
             images = [f.filename for f in fh.filelist if 'Image' in f.filename]
@@ -177,6 +182,7 @@ class RASXfile:
 
                 with fh.open(metafile) as xml:
                     meta.append(parse_rasx_metadata(xml))
+                    self.metadata_paths.append(metafile)
                 optics = meta[-1]['HardwareConfig']['optics']
                 if optics['Detector'] == 'HyPix3000(H)':
                     det_shape = 385, 775
@@ -239,36 +245,38 @@ class RASXfile:
                 arrays.
         """
         output = collections.defaultdict(list)
-
-        scan_axis = None
-        scan_info = self.get_scan_info()
-        if scan_info:
-            scan_axis = scan_info.get('AxisName', None)
-
-        for scan in self.data:
-            # get intensity and two_theta
-            two_theta, intensity, _ = scan.transpose(1, 0)
-            output['intensity'].append(to_pint_quantity(intensity, None))
-            output['2Theta'].append(
-                to_pint_quantity(
-                    two_theta,
-                    self.units.get(scan_axis, 'deg'),
+        aliases = {
+            'TwoTheta': '2Theta',
+            '2Theta': '2Theta',
+            'TwoThetaOmega': '2Theta',
+            'TwoThetaTheta': '2Theta',
+            'Omega': 'Omega',
+            'Chi': 'Chi',
+            'Phi': 'Phi',
+        }
+        coordinates = []
+        for profile, metadata in zip(self.data, self.meta):
+            info = metadata['ScanInformation']
+            name = info.get('AxisName')
+            if name not in aliases:
+                raise ValueError(f'Unsupported RASX scan axis: {name!r}.')
+            axes = {
+                ('2Theta' if axis.Name == 'TwoTheta' else axis.Name): to_pint_quantity(
+                    np.array([axis.Position]), axis.Unit
                 )
+                for axis in metadata['Axes'].values()
+                if axis.Name in ('TwoTheta', 'Omega', 'Chi', 'Phi', 'X', 'Y')
+                and axis.Position is not None
+            }
+            axes[aliases[name]] = to_pint_quantity(
+                profile[:, 0], info.get('PositionUnit', 'deg')
             )
-
-        for axis in ['Omega', 'Chi', 'Phi', 'X', 'Y']:
-            # get axis positions
-            if axis not in self.positions:
-                output[axis] = None
-                continue
-            if not isinstance(self.positions[axis], np.ndarray):
-                self.positions[axis] = np.array([self.positions[axis]])
-            for axis_data_per_scan in self.positions[axis]:
-                reshaped_axis_data = axis_data_per_scan.reshape(-1)
-                output[axis].append(
-                    to_pint_quantity(reshaped_axis_data, self.units.get(axis, 'deg'))
-                )
-
+            coordinates.append(axes)
+            output['intensity'].append(
+                intensity_quantity(profile[:, 1], info.get('IntensityUnit'))
+            )
+        for name in set().union(*(row.keys() for row in coordinates)):
+            output[name] = [row.get(name) for row in coordinates]
         return output
 
     def get_scan_info(self):
@@ -285,30 +293,26 @@ class RASXfile:
         Collects meta information of the X-ray source along with associated units.
 
         Returns:
-            Dict[str, Any]: Each dict item contains a list with numerical value
-                (float or int) at index 0 and unit (str) at index 1. One exception
-                is the item with key 'TargetName' which has str at both indices.
-                If quantity is not available, the dict item will default to [].
+            Dict[str, Any]: Available source quantities with units and the target
+                name as a string. Missing quantities are omitted.
         """
-        output = collections.defaultdict(list)
-        source = collections.defaultdict(
-            list, self.meta[0]['HardwareConfig']['xraygenerator']
-        )
+        output = {}
+        source = self.meta[0]['HardwareConfig']['xraygenerator']
 
-        if source['TargetName']:
+        if source.get('TargetName') is not None:
             output['TargetName'] = source['TargetName']
-        if source['Voltage']:
+        if source.get('Voltage') is not None:
             output['Voltage'] = to_pint_quantity(
                 source['Voltage'],
                 source.get('VoltageUnit', 'kV'),
             )
-        if source['Current']:
+        if source.get('Current') is not None:
             output['Current'] = to_pint_quantity(
                 source['Current'],
                 source.get('CurrentUnit', 'mA'),
             )
         for wavelength in ['WavelengthKalpha1', 'WavelengthKalpha2', 'WavelengthKbeta']:
-            if source[wavelength]:
+            if source.get(wavelength) is not None:
                 output[wavelength] = to_pint_quantity(
                     source[wavelength],
                     source.get(wavelength + 'Unit', 'angstrom'),
@@ -342,6 +346,8 @@ class BRMLfile:
 
             self.data = collections.defaultdict(list)
             self.motors = collections.defaultdict(list)
+            self.fixed_information = []
+            self.signal_units = collections.defaultdict(list)
             for i, rawpath in enumerate(rawlist):
                 if verbose:
                     if not i:
@@ -351,6 +357,9 @@ class BRMLfile:
                 with fh.open(rawpath, 'r') as xml:
                     # entering RawData<int>.xml
                     data = xmltodict.parse(xml.read(), encoding=encoding)
+                self.fixed_information.append(
+                    {'path': rawpath, 'value': data['RawData']['FixedInformation']}
+                )
                 dataroute = data['RawData']['DataRoutes']['DataRoute']
                 scaninfo = dataroute['ScanInformation']
                 nsteps = int(scaninfo['MeasurementPoints'])
@@ -363,6 +372,7 @@ class BRMLfile:
                 rdv = dataroute['DataViews']['RawDataView']
                 if not isinstance(rdv, list):
                     rdv = [rdv]
+                recorded_axes = {}
                 for view in rdv:
                     viewtype = view['@xsi:type']
                     vstart = int(view['@Start'])
@@ -370,37 +380,60 @@ class BRMLfile:
                     if viewtype == 'FixedRawDataView':
                         vname = view['@LogicName']
                         self.data[vname].append(rawdata[vstart : (vstart + vlen)])
+                        self.signal_units[vname].append(view.get('Unit', {}))
                     elif viewtype == 'RecordedRawDataView':
                         vname = view['Recording']['@LogicName']
                         self.data[vname].append(rawdata[vstart : (vstart + vlen)])
+                        self.signal_units[vname].append(
+                            view['Recording'].get('Unit', {})
+                        )
+                    elif (
+                        viewtype == 'VaryingRawDataView'
+                        and view['Varying'].get('@LogicName') == 'ScanAxes'
+                        and nsteps > 1
+                    ):
+                        fields = view['Varying']['FieldDefinitions']
+                        if not isinstance(fields, list):
+                            fields = [fields]
+                        for index, field in enumerate(fields):
+                            recorded_axes[field['@FieldName']] = {
+                                'Value': rawdata[vstart + index],
+                                'Unit': field['Restriction']['@Unit'],
+                            }
 
                 self.data['ScanName'].append(scaninfo['@ScanName'])
-                self.data['TimePerStep'].append(scaninfo['TimePerStep'])
+                self.data['TimePerStep'].append(scaninfo.get('TimePerStep'))
                 self.data['TimePerStepEffective'].append(
-                    scaninfo['TimePerStepEffective']
+                    scaninfo.get('TimePerStepEffective')
                 )
-                self.data['ScanMode'].append(scaninfo['ScanMode'])
+                self.data['ScanMode'].append(scaninfo.get('ScanMode'))
+                self.data['start_time'].append(data['RawData'].get('TimeStampStarted'))
+                self.data['end_time'].append(data['RawData'].get('TimeStampFinished'))
 
                 scanaxes = scaninfo['ScanAxes']['ScanAxisInfo']
                 if not isinstance(scanaxes, list):
                     scanaxes = [scanaxes]
                 for axis in scanaxes:
                     aname = axis['@AxisName']
-                    aunit = axis['Unit']['@Base']
-                    aref = float(axis['Reference'])
-                    astart = float(axis['Start']) + aref
-                    astop = float(axis['Stop']) + aref
-                    astep = float(axis['Increment'])
-                    nint = int(round(abs(astop - astart) / astep))
-                    adata = {}  # not originally part of Carsten's code
-                    if nsteps == 1:
-                        # true for rsm scans tested so far
-                        adata['Value'] = np.linspace(astart, astop, nint)
-                    if nsteps > 1:
-                        # true for 1d scans tested so far
-                        adata['Value'] = np.linspace(astart, astop, nsteps)
-                    adata['Unit'] = aunit.lower()
-                    self.data[aname].append(adata)
+                    if aname in recorded_axes:
+                        adata = recorded_axes[aname]
+                    else:
+                        aunit = axis['Unit']['@Base']
+                        aref = float(axis['Reference'])
+                        astart = float(axis['Start']) + aref
+                        astop = float(axis['Stop']) + aref
+                        astep = float(axis['Increment'])
+                        nint = int(round(abs(astop - astart) / astep))
+                        adata = {}  # not originally part of Carsten's code
+                        if nsteps == 1:
+                            # true for rsm scans tested so far
+                            adata['Value'] = np.linspace(astart, astop, nint)
+                        if nsteps > 1:
+                            # true for 1d scans tested so far
+                            adata['Value'] = np.linspace(astart, astop, nsteps)
+                        adata['Unit'] = aunit.lower()
+                    self.data[aname].extend([None] * (i + 1 - len(self.data[aname])))
+                    self.data[aname][i] = adata
 
                 drives = data['RawData']['FixedInformation']['Drives']['InfoData']
                 if not isinstance(drives, list):
@@ -412,7 +445,10 @@ class BRMLfile:
                     adata = {}  # not originally part of Carsten's code
                     adata['Value'] = apos
                     adata['Unit'] = aunit.lower()
-                    self.motors[aname].append(adata)
+                    self.motors[aname].extend(
+                        [None] * (i + 1 - len(self.motors[aname]))
+                    )
+                    self.motors[aname][i] = adata
 
             # (block starts) not originally part of Carsten's code
             try:
@@ -444,42 +480,32 @@ class BRMLfile:
         if len(counter_key) > 1:
             raise ValueError('More than one intensity counters found.')
 
-        for scan_intensity in self.data[counter_key[0]]:
+        signal_units = self.signal_units[counter_key[0]]
+        for index, scan_intensity in enumerate(self.data[counter_key[0]]):
             reshaped_intensity = scan_intensity.reshape(-1)
-            output['intensity'].append(to_pint_quantity(reshaped_intensity, None))
-        # TwoTheta is list of dicts
-        if 'TwoTheta' not in self.data:
-            output['2Theta'] = None
-        else:
-            for scan_two_theta in self.data['TwoTheta']:
-                scan_two_theta_value = scan_two_theta.get('Value', np.array([]))
-                if not isinstance(scan_two_theta_value, np.ndarray):
-                    scan_two_theta_value = np.array([scan_two_theta_value])
-                scan_two_theta_value = scan_two_theta_value.reshape(-1)
-                output['2Theta'].append(
-                    to_pint_quantity(
-                        scan_two_theta.get('Value', np.array([])),
-                        scan_two_theta.get('Unit', 'deg'),
-                    )
+            units = signal_units[index]
+            output['intensity'].append(
+                intensity_quantity(
+                    reshaped_intensity, units.get('@Base'), prefix=units.get('@Prefix')
                 )
-
-        # Theta is used in place of Omega in the BRML file
-        for axis in ['Theta', 'Chi', 'Phi']:
-            if axis not in self.motors:
-                output[axis] = None
-                continue
-            # each axis is list of dicts
-            for ax_data_per_scan in self.motors[axis]:
-                ax_data_value = ax_data_per_scan.get('Value', np.array([]))
-                if not isinstance(ax_data_value, np.ndarray):
-                    ax_data_value = np.array([ax_data_value])
-                ax_data_value = ax_data_value.reshape(-1)
-                output[axis].append(
+            )
+        # Prefer recorded/scanned positions per block, not for the whole file.
+        for axis in ['TwoTheta', 'Theta', 'Chi', 'Phi']:
+            scanned, fixed = self.data.get(axis, []), self.motors.get(axis, [])
+            positions = []
+            for index in range(len(output['intensity'])):
+                position = scanned[index] if index < len(scanned) else None
+                if position is None and index < len(fixed):
+                    position = fixed[index]
+                positions.append(
                     to_pint_quantity(
-                        ax_data_value,
-                        ax_data_per_scan.get('Unit', 'deg'),
+                        np.atleast_1d(position['Value']), position.get('Unit', 'deg')
                     )
+                    if position is not None
+                    else None
                 )
+            key = '2Theta' if axis == 'TwoTheta' else axis
+            output[key] = positions if any(p is not None for p in positions) else None
 
         return output
 
@@ -491,9 +517,11 @@ class BRMLfile:
             Dict[str, Any]: contains information about the scan
         """
         output = collections.defaultdict(list)
-        for key in ['ScanName']:
+        for key in ['ScanName', 'ScanMode', 'start_time']:
             if self.data.get(key) is not None:
                 output[key] = self.data.get(key)[0]
+        if self.data.get('end_time'):
+            output['end_time'] = self.data['end_time'][-1]
 
         return output
 
@@ -502,12 +530,10 @@ class BRMLfile:
         Collects meta information of the X-ray source along with associated units.
 
         Returns:
-            Dict[str, Any]: Each dict item contains a list with numerical value
-                (float or int) at index 0 and unit (str) at index 1. One exception
-                is the item with key 'TubeMaterial' which has str at both indices.
-                If quantity is not available, the dict item will default to [].
+            Dict[str, Any]: Available source quantities with units and the tube
+                material as a string. Missing quantities are omitted.
         """
-        output = collections.defaultdict(list)
+        output = {}
 
         source = {}
         for component in self.mounted_optics_info:

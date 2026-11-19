@@ -4,7 +4,7 @@
     "Omega": "(401,)",
     "Chi": "(1,)",
     "Phi": "(1,)",
-    "countTime": null,
+    "countTime": "(1,)",
     "metadata": {
         "sample_id": null,
         "scan_axis": "TwoTheta",
@@ -17,6 +17,9 @@
             "voltage": "45",
             "current": "200",
             "ratioKAlpha2KAlpha1": null
-        }
+        },
+        "scan_mode": "STEP",
+        "start_time": "2021-05-05T14:27:55Z",
+        "end_time": "2021-05-05T14:35:56Z"
     }
 }

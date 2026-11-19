@@ -4,7 +4,7 @@
     "Omega": "(801,)",
     "Chi": "(1,)",
     "Phi": "(1,)",
-    "countTime": null,
+    "countTime": "(1,)",
     "metadata": {
         "sample_id": null,
         "scan_axis": "PsdFixed",
@@ -17,6 +17,9 @@
             "ratioKAlpha2KAlpha1": "0.5",
             "voltage": "40.0",
             "current": "40.0"
-        }
+        },
+        "scan_mode": "StillScan",
+        "start_time": "2022-01-04T15:38:37.6903022+01:00",
+        "end_time": "2022-01-04T18:24:18.5306421+01:00"
     }
 }

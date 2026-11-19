@@ -51,6 +51,8 @@ class XRDMetadata(BaseModel):
     sample_mode: str | None = None
     instrument_id: str | None = None
     start_time: str | None = None
+    end_time: str | None = None
+    details: dict[str, Any] | None = None
     scan_mode: str | None = None
     scan_axis: str | None = None
     scan_type: str | None = None
@@ -58,11 +60,11 @@ class XRDMetadata(BaseModel):
 
 
 class XRDOutput(BaseModel):
-    """Output of a `read_*` function. Only 2Theta and intensity are required."""
+    """Measured signals with reported coordinates, including fixed-angle scans."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
-    two_theta: Quantity = Field(alias='2Theta')
+    two_theta: Quantity | None = Field(default=None, alias='2Theta')
     intensity: Quantity
     Omega: Quantity | None = None
     Chi: Quantity | None = None
@@ -78,10 +80,25 @@ class XRDOutput(BaseModel):
 
     @model_validator(mode='after')
     def intensity_matches_two_theta(self):
-        if self.intensity.shape[-1] != self.two_theta.shape[-1]:
+        if not self.intensity.shape:
+            raise ValueError('intensity must contain measurement points')
+        if self.two_theta is None:
+            if (
+                self.Omega is None
+                or self.metadata is None
+                or self.metadata.scan_axis != 'Omega'
+            ):
+                raise ValueError('2Theta is required unless an Omega scan is reported')
+            if self.Omega.shape != self.intensity.shape:
+                raise ValueError('Omega must match the reported scan intensity')
+        elif self.two_theta.shape not in (
+            (1,),
+            (self.intensity.shape[-1],),
+            self.intensity.shape,
+        ):
             raise ValueError(
                 f'intensity has {self.intensity.shape[-1]} points along 2Theta, '
-                f'but 2Theta has {self.two_theta.shape[-1]}'
+                f'but 2Theta has shape {self.two_theta.shape}'
             )
         return self
 

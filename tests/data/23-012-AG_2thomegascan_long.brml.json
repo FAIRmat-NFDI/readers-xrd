@@ -1,10 +1,10 @@
 {
     "intensity": "(2001,)",
     "2Theta": "(2001,)",
-    "Omega": null,
+    "Omega": "(2001,)",
     "Chi": "(1,)",
     "Phi": "(1,)",
-    "countTime": null,
+    "countTime": "(1,)",
     "metadata": {
         "sample_id": null,
         "scan_axis": "TwoThetaOmegaScan",
@@ -17,6 +17,9 @@
             "ratioKAlpha2KAlpha1": "0.5",
             "voltage": "40.0",
             "current": "40.0"
-        }
+        },
+        "scan_mode": "ContinuousScan",
+        "start_time": "2023-01-26T15:23:09.837152+01:00",
+        "end_time": "2023-01-26T15:57:00.2452847+01:00"
     }
 }
